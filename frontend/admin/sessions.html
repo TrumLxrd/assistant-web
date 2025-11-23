@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sessions - Admin Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../shared/css/common.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo-circle">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                    <path d="M2 17l10 5 10-5"></path>
+                    <path d="M2 12l10 5 10-5"></path>
+                </svg>
+            </div>
+            <h2>Admin Panel</h2>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="dashboard.html" class="nav-item">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+                <span>Dashboard</span>
+            </a>
+            <a href="centers.html" class="nav-item">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                </svg>
+                <span>Centers</span>
+            </a>
+            <a href="assistants.html" class="nav-item">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                <span>Assistants</span>
+            </a>
+            <a href="sessions.html" class="nav-item active">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+                <span>Sessions</span>
+            </a>
+            <a href="attendance.html" class="nav-item">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                </svg>
+                <span>Attendance</span>
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar" id="user-avatar">A</div>
+                <div class="user-details">
+                    <div class="user-name" id="user-name">Admin</div>
+                    <div class="user-role">Administrator</div>
+                </div>
+            </div>
+            <button class="btn-logout" id="logout-btn" title="Logout">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="top-bar">
+            <h1>Sessions Management</h1>
+            <button class="btn btn-primary" id="add-session-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Add Session
+            </button>
+        </div>
+
+        <div id="alert-container"></div>
+
+        <!-- Sessions Table -->
+        <div class="card">
+            <div class="section-header" style="margin-bottom: 1.5rem;">
+                <h2>All Sessions</h2>
+                <input type="text" id="search-input" class="form-input" placeholder="Search sessions..."
+                    style="max-width: 300px;">
+            </div>
+
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Subject</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Center</th>
+                            <th>Assistant</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sessions-table">
+                        <tr>
+                            <td colspan="6" class="text-center">
+                                <div class="loading-spinner"></div>
+                                Loading sessions...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Session Modal -->
+    <div class="modal-overlay" id="session-modal">
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 id="modal-title">Add New Session</h3>
+                <button class="modal-close" id="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="session-form">
+                    <input type="hidden" id="session-id">
+
+                    <div class="form-group">
+                        <label class="form-label">Subject *</label>
+                        <input type="text" id="session-subject" class="form-input" required
+                            placeholder="e.g., Mathematics">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Recurrence Type *</label>
+                        <select id="session-recurrence" class="form-select" required>
+                            <option value="one_time">One Time</option>
+                            <option value="weekly">Weekly (Recurring)</option>
+                        </select>
+                        <small style="color: #666; font-size: 0.875rem;">Choose if this session repeats weekly or is
+                            one-time only</small>
+                    </div>
+
+                    <div class="form-group" id="day-of-week-group" style="display: none;">
+                        <label class="form-label">Day of Week *</label>
+                        <select id="session-day-of-week" class="form-select">
+                            <option value="">Select Day</option>
+                            <option value="1">Monday</option>
+                            <option value="2">Tuesday</option>
+                            <option value="3">Wednesday</option>
+                            <option value="4">Thursday</option>
+                            <option value="5">Friday</option>
+                            <option value="6">Saturday</option>
+                            <option value="7">Sunday</option>
+                        </select>
+                        <small style="color: #666; font-size: 0.875rem;">For weekly sessions, select which day it
+                            repeats</small>
+                    </div>
+
+                    <div class="form-group" id="date-group">
+                        <label class="form-label">Date *</label>
+                        <input type="date" id="session-date" class="form-input" required>
+                        <small style="color: #666; font-size: 0.875rem;" id="date-help">For one-time sessions, select
+                            the specific date</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Start Time *</label>
+                        <input type="time" id="session-time" class="form-input" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Center *</label>
+                        <select id="session-center" class="form-select" required>
+                            <option value="">Select Center</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Pre-assign Assistant (Optional)</label>
+                        <select id="session-assistant" class="form-select">
+                            <option value="">Any Assistant (Open Session)</option>
+                        </select>
+                        <small style="color: #666; font-size: 0.875rem;">Leave empty to allow any assistant to mark
+                            attendance</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" id="cancel-btn">Cancel</button>
+                <button type="submit" form="session-form" class="btn btn-primary" id="save-btn">Save Session</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="delete-modal">
+        <div class="modal" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3>Delete Session</h3>
+                <button class="modal-close" id="close-delete-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete "<strong id="delete-session-name"></strong>"?</p>
+                <p style="color: var(--accent-red); margin-bottom: 0;">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" id="cancel-delete-btn">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../shared/js/api.js"></script>
+    <script src="js/sessions.js"></script>
+</body>
+
+</html>

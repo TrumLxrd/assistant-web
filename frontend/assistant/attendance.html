@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#6366f1">
+    <title>Mark Attendance - Attendance System</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="../shared/css/common.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <header class="header">
+        <div class="header-content">
+            <h1>📍 Mark Attendance</h1>
+            <a href="sessions.html" class="btn btn-outline" style="font-size: 0.9rem;">
+                ← Back to Sessions
+            </a>
+        </div>
+    </header>
+
+    <main class="main-content attendance-container">
+        <div id="alert-container"></div>
+
+        <div id="loading-spinner" class="spinner"></div>
+
+        <div id="attendance-content" style="display: none;">
+            <!-- Session Details -->
+            <div class="session-details">
+                <h2 id="session-subject">Loading...</h2>
+                <div class="details-grid">
+                    <div class="detail-item">
+                        <div class="detail-label">Center</div>
+                        <div class="detail-value" id="session-center">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Time</div>
+                        <div class="detail-value" id="session-time">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Required Radius</div>
+                        <div class="detail-value" id="session-radius">30m</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GPS Status -->
+            <div id="gps-status" class="gps-status checking">
+                <strong>🔍 Checking your location...</strong>
+                <p>Please enable GPS and wait</p>
+            </div>
+
+            <!-- Map -->
+            <div id="map"></div>
+
+            <!-- Confirm Button -->
+            <button id="confirm-btn" class="btn btn-primary btn-block" disabled>
+                Confirm Attendance
+            </button>
+        </div>
+    </main>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="../shared/js/api.js"></script>
+    <script src="js/gps.js"></script>
+    <script src="js/attendance.js"></script>
+</body>
+
+</html>

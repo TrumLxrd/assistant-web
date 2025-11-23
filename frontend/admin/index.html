@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - Attendance System</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="../shared/css/common.css">
+    <link rel="stylesheet" href="../assistant/css/style.css">
+</head>
+
+<body>
+    <div class="login-container">
+        <div class="login-card card">
+            <div class="login-header text-center">
+                <div class="logo-circle">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                        <path d="M2 17l10 5 10-5"></path>
+                        <path d="M2 12l10 5 10-5"></path>
+                    </svg>
+                </div>
+                <h1>Admin Portal</h1>
+                <p>Sign in to manage the system</p>
+            </div>
+
+            <div id="alert-container"></div>
+
+            <form id="admin-login-form">
+                <div class="form-group">
+                    <label for="email" class="form-label">Email Address</label>
+                    <input type="email" id="email" class="form-input" placeholder="admin@example.com" required
+                        autocomplete="email">
+                </div>
+
+                <div class="form-group">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" id="password" class="form-input" placeholder="••••••••" required
+                        autocomplete="current-password">
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block" id="login-btn">
+                    <span id="btn-text">Sign In as Admin</span>
+                    <span id="btn-spinner" class="hidden">
+                        <div class="btn-spinner"></div>
+                    </span>
+                </button>
+            </form>
+
+            <div class="login-footer text-center mt-3">
+                <p class="text-gray">
+                    <a href="../assistant/index.html" style="color: var(--primary-color);">Assistant Login →</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="../shared/js/api.js"></script>
+    <script>
+        // Check if already logged in as admin
+        const user = window.api.getUser();
+        if (window.api.isAuthenticated() && user && user.role === 'admin') {
+            window.location.href = 'dashboard.html';
+        }
+
+        const loginForm = document.getElementById('admin-login-form');
+        const loginBtn = document.getElementById('login-btn');
+        const btnText = document.getElementById('btn-text');
+        const btnSpinner = document.getElementById('btn-spinner');
+        const alertContainer = document.getElementById('alert-container');
+
+        function showAlert(message, type = 'error') {
+            const alertClass = type === 'error' ? 'alert-error' : 'alert-success';
+            alertContainer.innerHTML = `<div class="alert ${alertClass}">${message}</div>`;
+        }
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            alertContainer.innerHTML = '';
+
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+
+            loginBtn.disabled = true;
+            btnText.classList.add('hidden');
+            btnSpinner.classList.remove('hidden');
+
+            try {
+                const response = await window.api.makeRequest('POST', '/auth/login', { email, password });
+
+                if (response.success) {
+                    // Check if admin role
+                    if (response.data.user.role !== 'admin') {
+                        showAlert('Access denied. Admin credentials required.');
+                        loginBtn.disabled = false;
+                        btnText.classList.remove('hidden');
+                        btnSpinner.classList.add('hidden');
+                        return;
+                    }
+
+                    window.api.saveToken(response.data.token);
+                    window.api.saveUser(response.data.user);
+                    window.location.href = 'dashboard.html';
+                }
+            } catch (error) {
+                showAlert(error.message || 'Login failed');
+                loginBtn.disabled = false;
+                btnText.classList.remove('hidden');
+                btnSpinner.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+
+</html>
