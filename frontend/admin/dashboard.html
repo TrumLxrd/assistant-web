@@ -115,11 +115,42 @@
         </div>
     </div>
 
+    <!-- Sidebar Toggle Button -->
+    <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle Sidebar">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+    </button>
+
     <!-- Main Content -->
     <div class="main-content">
-        <div class="top-bar">
-            <h1>Dashboard</h1>
-            <div class="current-date" id="current-date"></div>
+        <!-- Welcome Hero Section -->
+        <div class="welcome-hero">
+            <div class="hero-content">
+                <div class="hero-greeting">
+                    <h1 class="hero-title">
+                        Welcome back, <span id="user-greeting">Admin</span>! 👋
+                    </h1>
+                    <p class="hero-subtitle">Here's what's happening with your attendance system today</p>
+                </div>
+            </div>
+            <div class="hero-visual">
+                <div class="hero-chart-placeholder">
+                    <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+                        <circle cx="60" cy="60" r="50" stroke="rgba(102, 126, 234, 0.2)" stroke-width="8"/>
+                        <circle cx="60" cy="60" r="50" stroke="url(#gradient)" stroke-width="8" stroke-dasharray="314" stroke-dashoffset="78.5" stroke-linecap="round"/>
+                        <defs>
+                            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#667eea"/>
+                                <stop offset="100%" stop-color="#764ba2"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <div class="chart-label">85%<br><small>On Time</small></div>
+                </div>
+            </div>
         </div>
 
         <div id="alert-container"></div>
@@ -183,63 +214,149 @@
             </div>
         </div>
 
-        <!-- Quick Actions -->
-        <div class="section-header">
-            <h2>Quick Actions</h2>
-        </div>
-
-        <div class="quick-actions">
-            <a href="centers.html" class="action-card">
-                <div class="action-icon">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="12" y1="8" x2="12" y2="16"></line>
-                        <line x1="8" y1="12" x2="16" y2="12"></line>
-                    </svg>
+        <!-- Dashboard Content Grid -->
+        <div class="dashboard-grid">
+            <!-- Quick Actions -->
+            <div class="dashboard-section">
+                <div class="section-header">
+                    <h2>Quick Actions</h2>
+                    <p class="section-subtitle">Common tasks to get you started</p>
                 </div>
-                <h3>Add New Center</h3>
-                <p>Create a new educational center</p>
-            </a>
 
-            <a href="assistants.html" class="action-card">
-                <div class="action-icon">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="8.5" cy="7" r="4"></circle>
-                        <line x1="20" y1="8" x2="20" y2="14"></line>
-                        <line x1="23" y1="11" x2="17" y2="11"></line>
-                    </svg>
-                </div>
-                <h3>Add Assistant</h3>
-                <p>Register a new assistant</p>
-            </a>
+                <div class="quick-actions">
+                    <a href="centers.html" class="action-card">
+                        <div class="action-icon">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="16"></line>
+                                <line x1="8" y1="12" x2="16" y2="12"></line>
+                            </svg>
+                        </div>
+                        <div class="action-content">
+                            <h3>Add New Center</h3>
+                            <p>Create a new educational center</p>
+                        </div>
+                        <div class="action-arrow">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </div>
+                    </a>
 
-            <a href="sessions.html" class="action-card">
-                <div class="action-icon">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                        <line x1="16" y1="2" x2="16" y2="6"></line>
-                        <line x1="8" y1="2" x2="8" y2="6"></line>
-                        <line x1="3" y1="10" x2="21" y2="10"></line>
-                        <line x1="12" y1="14" x2="12" y2="18"></line>
-                        <line x1="10" y1="16" x2="14" y2="16"></line>
-                    </svg>
-                </div>
-                <h3>Create Session</h3>
-                <p>Schedule a new session</p>
-            </a>
+                    <a href="assistants.html" class="action-card">
+                        <div class="action-icon">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="8.5" cy="7" r="4"></circle>
+                                <line x1="20" y1="8" x2="20" y2="14"></line>
+                                <line x1="23" y1="11" x2="17" y2="11"></line>
+                            </svg>
+                        </div>
+                        <div class="action-content">
+                            <h3>Add Assistant</h3>
+                            <p>Register a new assistant</p>
+                        </div>
+                        <div class="action-arrow">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </div>
+                    </a>
 
-            <a href="attendance.html" class="action-card">
-                <div class="action-icon">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="9" y1="15" x2="15" y2="15"></line>
-                    </svg>
+                    <a href="sessions.html" class="action-card">
+                        <div class="action-icon">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="16" y1="2" x2="16" y2="6"></line>
+                                <line x1="8" y1="2" x2="8" y2="6"></line>
+                                <line x1="3" y1="10" x2="21" y2="10"></line>
+                                <line x1="12" y1="14" x2="12" y2="18"></line>
+                                <line x1="10" y1="16" x2="14" y2="16"></line>
+                            </svg>
+                        </div>
+                        <div class="action-content">
+                            <h3>Create Session</h3>
+                            <p>Schedule a new session</p>
+                        </div>
+                        <div class="action-arrow">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </div>
+                    </a>
+
+                    <a href="attendance.html" class="action-card">
+                        <div class="action-icon">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="9" y1="15" x2="15" y2="15"></line>
+                            </svg>
+                        </div>
+                        <div class="action-content">
+                            <h3>View Reports</h3>
+                            <p>Check attendance records</p>
+                        </div>
+                        <div class="action-arrow">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </div>
+                    </a>
                 </div>
-                <h3>View Reports</h3>
-                <p>Check attendance records</p>
-            </a>
+            </div>
+
+            <!-- Activity Timeline -->
+            <div class="dashboard-section">
+                <div class="section-header">
+                    <h2>Recent Activity</h2>
+                    <p class="section-subtitle">Latest system events and updates</p>
+                </div>
+
+                <div class="activity-timeline" id="activity-timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="8.5" cy="7" r="4"></circle>
+                                <polyline points="17 11 19 13 23 9"></polyline>
+                            </svg>
+                        </div>
+                        <div class="timeline-content">
+                            <div class="timeline-title">New assistant registered</div>
+                            <div class="timeline-meta">2 minutes ago</div>
+                        </div>
+                    </div>
+
+                    <div class="timeline-item">
+                        <div class="timeline-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="16" y1="2" x2="16" y2="6"></line>
+                                <line x1="8" y1="2" x2="8" y2="6"></line>
+                                <line x1="3" y1="10" x2="21" y2="10"></line>
+                            </svg>
+                        </div>
+                        <div class="timeline-content">
+                            <div class="timeline-title">Session completed at Cairo Center</div>
+                            <div class="timeline-meta">15 minutes ago</div>
+                        </div>
+                    </div>
+
+                    <div class="timeline-item">
+                        <div class="timeline-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                            </svg>
+                        </div>
+                        <div class="timeline-content">
+                            <div class="timeline-title">Backup completed successfully</div>
+                            <div class="timeline-meta">1 hour ago</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Recent Attendance -->

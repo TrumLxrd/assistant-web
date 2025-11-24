@@ -1009,7 +1009,7 @@ const recordAttendanceManually = async (req, res) => {
  */
 const getAuditLogs = async (req, res) => {
     try {
-        const { start_date, end_date, user_id, action, limit = 100 } = req.query;
+        const { start_date, end_date, user_id, action, page = 1, limit = 50 } = req.query;
 
         let query = `
             SELECT al.id, al.action, al.details, al.created_at,
@@ -1041,14 +1041,51 @@ const getAuditLogs = async (req, res) => {
             params.push(`%${action}%`);
         }
 
-        query += ' ORDER BY al.created_at DESC LIMIT ?';
-        params.push(parseInt(limit));
+        // Get total count for pagination
+        let countQuery = `
+            SELECT COUNT(*) as total
+            FROM audit_log al
+            LEFT JOIN users u ON al.user_id = u.id
+            WHERE 1=1
+        `;
+
+        const countParams = [...params]; // Copy params for count
+
+        if (start_date) {
+            countQuery += ' AND DATE(al.created_at) >= ?';
+        }
+
+        if (end_date) {
+            countQuery += ' AND DATE(al.created_at) <= ?';
+        }
+
+        if (user_id) {
+            countQuery += ' AND al.user_id = ?';
+        }
+
+        if (action) {
+            countQuery += ' AND al.action LIKE ?';
+        }
+
+        const [countResult] = await db.query(countQuery, countParams);
+        const total = countResult[0].total;
+
+        // Add pagination
+        const offset = (page - 1) * limit;
+        query += ' ORDER BY al.created_at DESC LIMIT ? OFFSET ?';
+        params.push(parseInt(limit), parseInt(offset));
 
         const [logs] = await db.query(query, params);
 
         res.json({
             success: true,
-            data: logs
+            data: logs,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total,
+                pages: Math.ceil(total / limit)
+            }
         });
     } catch (error) {
         console.error('Get audit logs error:', error);

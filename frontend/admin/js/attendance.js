@@ -447,6 +447,115 @@ document.getElementById('clear-attendance-modal').addEventListener('click', (e) 
 });
 
 // Initialize
+initializeSidebar();
 loadFilters();
 loadAttendance({}, 1);
 loadManualAttendanceData();
+
+// Sidebar functionality (shared across admin pages)
+function initializeSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+
+    if (!sidebar || !sidebarToggle) return;
+
+    // Touch/swipe variables
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchEndX = 0;
+    let touchEndY = 0;
+    const minSwipeDistance = 50;
+    const maxVerticalDistance = 100;
+
+    // Auto-hide sidebar on page load for larger screens
+    if (window.innerWidth > 768) {
+        sidebar.classList.add('collapsed');
+        sidebarToggle.classList.add('show');
+    }
+
+    // Toggle sidebar on button click
+    sidebarToggle.addEventListener('click', () => {
+        sidebar.classList.toggle('collapsed');
+        sidebarToggle.classList.toggle('show');
+    });
+
+    // Show sidebar on hover when collapsed (desktop only)
+    if (window.innerWidth > 768) {
+        let hoverTimeout;
+
+        sidebar.addEventListener('mouseenter', () => {
+            if (sidebar.classList.contains('collapsed')) {
+                clearTimeout(hoverTimeout);
+                sidebar.classList.remove('collapsed');
+            }
+        });
+
+        sidebar.addEventListener('mouseleave', () => {
+            if (!sidebar.classList.contains('collapsed')) {
+                hoverTimeout = setTimeout(() => {
+                    sidebar.classList.add('collapsed');
+                    sidebarToggle.classList.add('show');
+                }, 300);
+            }
+        });
+    }
+
+    // Touch event handlers for swipe gestures
+    document.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        touchEndY = e.changedTouches[0].screenY;
+        handleSwipe();
+    }, { passive: true });
+
+    // Handle swipe gestures
+    function handleSwipe() {
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = Math.abs(touchEndY - touchStartY);
+
+        // Only handle horizontal swipes (ignore vertical swipes)
+        if (deltaY > maxVerticalDistance) return;
+
+        // Swipe right to show sidebar
+        if (deltaX > minSwipeDistance) {
+            if (sidebar.classList.contains('collapsed')) {
+                sidebar.classList.remove('collapsed');
+                sidebarToggle.classList.remove('show');
+            }
+        }
+        // Swipe left to hide sidebar
+        else if (deltaX < -minSwipeDistance) {
+            if (!sidebar.classList.contains('collapsed')) {
+                sidebar.classList.add('collapsed');
+                sidebarToggle.classList.add('show');
+            }
+        }
+    }
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+        if (window.innerWidth <= 768) {
+            sidebar.classList.remove('collapsed');
+            sidebarToggle.classList.add('show');
+        } else {
+            sidebar.classList.add('collapsed');
+            sidebarToggle.classList.add('show');
+        }
+    });
+
+    // Close sidebar when clicking outside (desktop only)
+    document.addEventListener('click', (e) => {
+        // Desktop behavior - auto-hide sidebar when clicking outside
+        if (window.innerWidth > 768 &&
+            !sidebar.contains(e.target) &&
+            !sidebarToggle.contains(e.target) &&
+            !sidebar.classList.contains('collapsed')) {
+            sidebar.classList.add('collapsed');
+            sidebarToggle.classList.add('show');
+        }
+    });
+}
