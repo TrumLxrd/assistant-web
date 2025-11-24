@@ -31,12 +31,5 @@
             "src": "/(.*)",
             "dest": "/frontend/$1"
         }
-    ],
-    "env": {
-        "MONGODB_URI": "@mongodb_uri",
-        "JWT_SECRET": "@jwt_secret",
-        "JWT_EXPIRES_IN": "30d",
-        "JWT_REFRESH_EXPIRES_IN": "90d",
-        "NODE_ENV": "production"
-    }
+    ]
 }
