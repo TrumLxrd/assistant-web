@@ -17,7 +17,7 @@ const attendanceRoutes = require('./routes/attendanceRoutes');
 const centerRoutes = require('./routes/centerRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const backupRoutes = require('./routes/backupRoutes');
-const logRoutes = require('./routes/logRoutes'); // new log endpoint
+const logRoutes = require('./routes/logRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -31,7 +31,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from the frontend directory
-app.use(express.static(path.join(__dirname, '../frontend')));
+try {
+    // In Vercel, __dirname might be different, but this is standard for Node
+    app.use(express.static(path.join(__dirname, '../frontend')));
+} catch (err) {
+    console.error('Error setting up static files:', err);
+}
 
 /* ---------- Request logging ---------- */
 app.use((req, res, next) => {
@@ -46,25 +51,35 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/centers', centerRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/backups', backupRoutes);
-app.use('/api/log', logRoutes); // expose log endpoint
+app.use('/api/log', logRoutes);
 
 /* ---------- Health check ---------- */
 app.get('/api/health', (req, res) => {
-    const dbStatus = mongoose.connection.readyState;
-    const statusMap = {
-        0: 'disconnected',
-        1: 'connected',
-        2: 'connecting',
-        3: 'disconnecting'
-    };
+    try {
+        const dbStatus = mongoose.connection ? mongoose.connection.readyState : 0;
+        const statusMap = {
+            0: 'disconnected',
+            1: 'connected',
+            2: 'connecting',
+            3: 'disconnecting'
+        };
 
-    res.json({
-        status: 'ok',
-        timestamp: new Date(),
-        database: statusMap[dbStatus] || 'unknown',
-        env: process.env.NODE_ENV
-    });
+        res.json({
+            status: 'ok',
+            timestamp: new Date(),
+            database: statusMap[dbStatus] || 'unknown',
+            env: process.env.NODE_ENV
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Health check failed',
+            error: error.message,
+            stack: error.stack
+        });
+    }
 });
+
 app.get('/health', (req, res) => {
     res.json({
         success: true,
@@ -80,15 +95,7 @@ app.get('/', (req, res) => {
         success: true,
         message: 'Welcome to Assistant Attendance System API',
         version: '1.0.0',
-        database: 'MongoDB',
-        endpoints: {
-            auth: '/api/auth',
-            sessions: '/api/sessions',
-            attendance: '/api/attendance',
-            centers: '/api/centers',
-            admin: '/api/admin',
-            log: '/api/log'
-        }
+        database: 'MongoDB'
     });
 });
 
@@ -97,8 +104,7 @@ app.get('/api', (req, res) => {
     res.json({
         success: true,
         message: 'Assistant Attendance System API',
-        version: '1.0.0',
-        documentation: 'Please use specific endpoints'
+        version: '1.0.0'
     });
 });
 
@@ -113,10 +119,12 @@ app.use((req, res) => {
 /* ---------- Error handler ---------- */
 app.use((err, req, res, next) => {
     console.error('Error:', err);
+    // ALWAYS return error details for debugging purposes
     res.status(500).json({
         success: false,
         message: 'Internal server error',
-        error: process.env.NODE_ENV === 'development' ? err.message : undefined
+        error: err.message,
+        stack: err.stack
     });
 });
 
@@ -154,13 +162,6 @@ if (process.env.VERCEL !== '1') {
             console.log('  🎯 Assistant Attendance System');
             console.log('═══════════════════════════════════════════════════════');
             console.log(`  ✅ Server running on port ${PORT} (${protocol.toUpperCase()})`);
-            console.log('');
-            console.log('  📱 ASSISTANT PWA:');
-            console.log(`     ${protocol}://localhost:${PORT}/assistant/`);
-            console.log('');
-            console.log('  👨‍💼 ADMIN DASHBOARD:');
-            console.log(`     ${protocol}://localhost:${PORT}/admin/`);
-            console.log('═══════════════════════════════════════════════════════');
         });
     }).catch(err => {
         console.error('Failed to connect to MongoDB:', err);
@@ -168,6 +169,9 @@ if (process.env.VERCEL !== '1') {
     });
 } else {
     // For Vercel: Connect to MongoDB without starting HTTP server
+    // We don't await here because Vercel functions are stateless/ephemeral
+    // but we hope the connection is established before the request is processed
+    // or that Mongoose buffers the commands.
     connectDB().catch(err => {
         console.error('Failed to connect to MongoDB in Vercel:', err);
     });
@@ -175,4 +179,3 @@ if (process.env.VERCEL !== '1') {
 
 // Export app for Vercel serverless function
 module.exports = app;
-
