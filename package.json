@@ -1,0 +1,17 @@
+{
+    "name": "attendance-system",
+    "version": "1.0.0",
+    "description": "GPS-based attendance tracking system",
+    "scripts": {
+        "install-backend": "cd backend && npm install",
+        "postinstall": "npm run install-backend"
+    },
+    "keywords": [
+        "attendance",
+        "gps",
+        "mongodb",
+        "vercel"
+    ],
+    "author": "",
+    "license": "ISC"
+}
