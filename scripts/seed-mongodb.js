@@ -7,7 +7,7 @@
  * Usage: node scripts/seed-mongodb.js
  */
 
-require('dotenv').config({ path: './.env' });
+require('dotenv').config({ path: './backend/.env' });
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 

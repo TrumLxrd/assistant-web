@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance System | Portal Selection</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-dark: #4338ca;
+            --secondary: #10B981;
+            --secondary-dark: #059669;
+            --dark: #111827;
+            --light: #F3F4F6;
+            --white: #FFFFFF;
+            --gray: #6B7280;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--light);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            color: var(--dark);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            font-weight: 800;
+        }
+
+        p.subtitle {
+            color: var(--gray);
+            font-size: 1.1rem;
+            margin-bottom: 3rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .card {
+            background: var(--white);
+            padding: 2.5rem;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 2px solid transparent;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        .card-icon {
+            font-size: 3rem;
+            margin-bottom: 1.5rem;
+            background: var(--light);
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        .card h2 {
+            color: var(--dark);
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .card p {
+            color: var(--gray);
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        /* Admin Card Styles */
+        .card.admin:hover {
+            border-color: var(--primary);
+        }
+
+        .card.admin:hover .card-icon {
+            background: #EEF2FF;
+            color: var(--primary);
+        }
+
+        /* Assistant Card Styles */
+        .card.assistant:hover {
+            border-color: var(--secondary);
+        }
+
+        .card.assistant:hover .card-icon {
+            background: #ECFDF5;
+            color: var(--secondary);
+        }
+
+        footer {
+            margin-top: 4rem;
+            color: var(--gray);
+            font-size: 0.875rem;
+        }
+
+        @media (max-width: 768px) {
+            .cards {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Attendance System</h1>
+        <p class="subtitle">Secure GPS-based attendance tracking for educational centers. Please select your portal to
+            continue.</p>
+
+        <div class="cards">
+            <a href="/admin/" class="card admin">
+                <div class="card-icon">🛡️</div>
+                <h2>Admin Portal</h2>
+                <p>Manage centers, assistants, sessions, and view attendance reports.</p>
+            </a>
+
+            <a href="/assistant/" class="card assistant">
+                <div class="card-icon">📍</div>
+                <h2>Assistant App</h2>
+                <p>Mark your attendance using GPS and view your history.</p>
+            </a>
+        </div>
+
+        <footer>
+            &copy; 2024 Attendance System. All rights reserved.
+        </footer>
+    </div>
+</body>
+
+</html>

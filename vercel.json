@@ -41,7 +41,7 @@
         },
         {
             "src": "/?$",
-            "dest": "/frontend/admin/index.html"
+            "dest": "/frontend/index.html"
         }
     ]
 }
