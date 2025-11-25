@@ -47,6 +47,25 @@ const attendanceSchema = new mongoose.Schema({
         trim: true,
         maxlength: [500, 'Notes cannot exceed 500 characters']
     },
+    // Soft delete fields
+    is_deleted: {
+        type: Boolean,
+        default: false
+    },
+    deleted_by: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+    },
+    deleted_at: {
+        type: Date,
+        default: null
+    },
+    deletion_reason: {
+        type: String,
+        trim: true,
+        maxlength: [200, 'Deletion reason cannot exceed 200 characters']
+    },
     // Optional: Location in GeoJSON format
     location: {
         type: {

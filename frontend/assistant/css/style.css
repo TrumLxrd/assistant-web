@@ -318,6 +318,71 @@ body {
     border: 1px solid #ef4444;
 }
 
+/* Attendance History Page */
+.attendance-record-card {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-md);
+    margin-bottom: var(--spacing-lg);
+    transition: all var(--transition-normal);
+    border-left: 4px solid #0ea5e9;
+}
+
+.attendance-record-card:hover {
+    box-shadow: var(--shadow-xl);
+    transform: translateY(-2px);
+}
+
+.attendance-record-card.deleted-record {
+    border-left-color: #ef4444;
+    opacity: 0.8;
+    background: #fef2f2;
+}
+
+.record-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.record-header h4 {
+    margin: 0;
+    color: var(--text-dark);
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.record-details {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.record-detail-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    color: var(--text-gray);
+    font-size: 0.9rem;
+}
+
+.record-detail-item svg {
+    flex-shrink: 0;
+    color: var(--text-gray);
+}
+
+.deleted-info {
+    color: #991b1b !important;
+    font-weight: 500;
+}
+
+.deletion-reason {
+    color: #7f1d1d !important;
+    font-style: italic;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .header-content {
@@ -332,5 +397,15 @@ body {
 
     .details-grid {
         grid-template-columns: 1fr;
+    }
+
+    .attendance-record-card {
+        padding: var(--spacing-md);
+    }
+
+    .record-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-sm);
     }
 }

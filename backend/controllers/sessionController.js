@@ -2,6 +2,7 @@ const Session = require('../models/Session');
 const Center = require('../models/Center');
 const Attendance = require('../models/Attendance');
 const mongoose = require('mongoose');
+const { getCurrentEgyptTime, getEgyptTimeDifferenceMinutes } = require('../utils/timezone');
 
 /**
  * Get assistant's sessions for today
@@ -72,18 +73,17 @@ const getTodaySessions = async (req, res) => {
 
             // Check if session is within attendance marking window
             // Allow 45 minutes before and 45 minutes after session start (90-minute window)
-            const now = new Date();
-            const sessionStartTime = new Date(session.start_time);
+            const now = getCurrentEgyptTime();
+            let sessionStartTime = new Date(session.start_time);
 
-            // For weekly sessions, adjust to today's time
+            // For weekly sessions, adjust to today's time in Egypt timezone
             if (session.recurrence_type === 'weekly') {
-                const todayDate = new Date();
+                const todayDate = getCurrentEgyptTime();
                 todayDate.setHours(sessionStartTime.getHours(), sessionStartTime.getMinutes(), 0, 0);
-                sessionStartTime.setTime(todayDate.getTime());
+                sessionStartTime = todayDate;
             }
 
-            const timeDiffMs = now - sessionStartTime;
-            const timeDiffMinutes = Math.floor(timeDiffMs / 60000);
+            const timeDiffMinutes = getEgyptTimeDifferenceMinutes(now, sessionStartTime);
             const canMarkAttendance = !attendance && timeDiffMinutes >= -30 && timeDiffMinutes <= 45;
 
             return {

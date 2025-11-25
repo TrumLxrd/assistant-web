@@ -5,6 +5,7 @@ const Attendance = require('../models/Attendance');
 const AuditLog = require('../models/AuditLog');
 const bcrypt = require('bcryptjs');
 const { logAuditAction } = require('../utils/auditLogger');
+const { parseAsEgyptTime, getCurrentEgyptTime, getEgyptTimeDifferenceMinutes } = require('../utils/timezone');
 
 /**
  * Get dashboard statistics
@@ -12,7 +13,7 @@ const { logAuditAction } = require('../utils/auditLogger');
  */
 const getDashboardStats = async (req, res) => {
     try {
-        const today = new Date();
+        const today = getCurrentEgyptTime();
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
@@ -287,7 +288,7 @@ const getAllSessions = async (req, res) => {
         const query = { is_active: true };
 
         if (date) {
-            const targetDate = new Date(date);
+            const targetDate = parseAsEgyptTime(date);
             targetDate.setHours(0, 0, 0, 0);
             const nextDay = new Date(targetDate);
             nextDay.setDate(nextDay.getDate() + 1);
@@ -414,7 +415,7 @@ const createSession = async (req, res) => {
             assistant_id,
             center_id,
             subject,
-            start_time,
+            start_time: parseAsEgyptTime(start_time),
             recurrence_type,
             day_of_week
         });
@@ -479,7 +480,7 @@ const updateSession = async (req, res) => {
         if (assistant_id !== undefined) updateData.assistant_id = assistant_id;
         if (center_id) updateData.center_id = center_id;
         if (subject) updateData.subject = subject;
-        if (start_time) updateData.start_time = start_time;
+        if (start_time) updateData.start_time = parseAsEgyptTime(start_time);
         if (recurrence_type) updateData.recurrence_type = recurrence_type;
         if (day_of_week !== undefined) updateData.day_of_week = day_of_week;
         if (is_active !== undefined) updateData.is_active = is_active;
@@ -564,12 +565,12 @@ const getAttendanceRecords = async (req, res) => {
         if (start_date || end_date) {
             query.time_recorded = {};
             if (start_date) {
-                const startDate = new Date(start_date);
+                const startDate = parseAsEgyptTime(start_date);
                 startDate.setHours(0, 0, 0, 0);
                 query.time_recorded.$gte = startDate;
             }
             if (end_date) {
-                const endDate = new Date(end_date);
+                const endDate = parseAsEgyptTime(end_date);
                 endDate.setHours(23, 59, 59, 999);
                 query.time_recorded.$lte = endDate;
             }
@@ -581,8 +582,11 @@ const getAttendanceRecords = async (req, res) => {
         // Get total count for pagination
         const total = await Attendance.countDocuments(query);
 
-        // Get records
-        let attendanceQuery = Attendance.find(query)
+        // Get records (exclude soft-deleted by default)
+        let attendanceQuery = Attendance.find({
+            ...query,
+            is_deleted: { $ne: true }
+        })
             .populate('assistant_id', 'name')
             .populate('center_id', 'name')
             .populate('session_id', 'subject start_time')
@@ -639,16 +643,16 @@ const getAttendanceRecords = async (req, res) => {
  */
 const recordAttendanceManually = async (req, res) => {
     try {
-        const { assistant_id, session_id, delay_minutes = 0, notes = '' } = req.body;
+        const { assistant_id, session_id, time_recorded, notes = '' } = req.body;
 
-        if (!assistant_id || !session_id) {
+        if (!assistant_id || !session_id || !time_recorded) {
             return res.status(400).json({
                 success: false,
-                message: 'Assistant and session are required'
+                message: 'Assistant, session, and time recorded are required'
             });
         }
 
-        // Get session to extract center_id
+        // Get session details
         const session = await Session.findById(session_id).lean();
         if (!session) {
             return res.status(404).json({
@@ -681,13 +685,30 @@ const recordAttendanceManually = async (req, res) => {
             });
         }
 
+        // Calculate delay using Egypt timezone (same logic as regular attendance)
+        const recordedTime = parseAsEgyptTime(time_recorded);
+        let sessionTime = new Date(session.start_time);
+
+        // For weekly sessions, set the time to today in Egypt timezone
+        if (session.recurrence_type === 'weekly') {
+            const today = getCurrentEgyptTime();
+            today.setHours(sessionTime.getHours(), sessionTime.getMinutes(), 0, 0);
+            sessionTime = today;
+        }
+
+        const delayMinutes = getEgyptTimeDifferenceMinutes(recordedTime, sessionTime);
+
+        // Calculate actual delay (same as regular attendance - full delay time)
+        const actualDelayMinutes = delayMinutes <= 0 ? 0 : delayMinutes;
+
         const newAttendance = new Attendance({
             assistant_id,
             session_id,
             center_id,
             latitude: center.latitude,
             longitude: center.longitude,
-            delay_minutes,
+            time_recorded: recordedTime,
+            delay_minutes: actualDelayMinutes,
             notes: notes || 'Manually recorded by admin'
         });
 
@@ -699,7 +720,7 @@ const recordAttendanceManually = async (req, res) => {
             assistant_id,
             session_id,
             center_id,
-            delay_minutes
+            delay_minutes: actualDelayMinutes
         });
 
         res.status(201).json({
@@ -717,36 +738,46 @@ const recordAttendanceManually = async (req, res) => {
 };
 
 /**
- * Clear/delete attendance record
+ * Clear/delete attendance record (soft delete)
  * DELETE /api/admin/attendance/:id
  */
 const clearAttendance = async (req, res) => {
     try {
         const { id } = req.params;
+        const { reason = '' } = req.body;
 
-        const deletedAttendance = await Attendance.findByIdAndDelete(id);
+        const attendance = await Attendance.findById(id);
 
-        if (!deletedAttendance) {
+        if (!attendance) {
             return res.status(404).json({
                 success: false,
                 message: 'Attendance record not found'
             });
         }
 
+        // Soft delete the record
+        attendance.is_deleted = true;
+        attendance.deleted_by = req.user.id;
+        attendance.deleted_at = getCurrentEgyptTime();
+        attendance.deletion_reason = reason || 'Deleted by admin';
+
+        await attendance.save();
+
         // Log the action
         await logAuditAction(req.user.id, 'DELETE_ATTENDANCE', {
-            attendance_id: id
+            attendance_id: id,
+            reason: attendance.deletion_reason
         });
 
         res.json({
             success: true,
-            message: 'Attendance record deleted successfully'
+            message: 'Attendance record marked as deleted successfully'
         });
     } catch (error) {
         console.error('Clear attendance error:', error);
         res.status(500).json({
             success: false,
-            message: 'Error deleting attendance record'
+            message: 'Error marking attendance record as deleted'
         });
     }
 };
@@ -813,7 +844,7 @@ const updateAttendance = async (req, res) => {
         if (assistant_id) updateData.assistant_id = assistant_id;
         if (session_id) updateData.session_id = session_id;
         if (center_id) updateData.center_id = center_id;
-        if (time_recorded) updateData.time_recorded = new Date(time_recorded);
+        if (time_recorded) updateData.time_recorded = parseAsEgyptTime(time_recorded);
         if (delay_minutes !== undefined) updateData.delay_minutes = parseInt(delay_minutes);
         if (notes !== undefined) updateData.notes = notes;
 
@@ -1143,12 +1174,12 @@ const getAuditLogs = async (req, res) => {
         if (start_date || end_date) {
             query.timestamp = {};
             if (start_date) {
-                const startDate = new Date(start_date);
+                const startDate = parseAsEgyptTime(start_date);
                 startDate.setHours(0, 0, 0, 0);
                 query.timestamp.$gte = startDate;
             }
             if (end_date) {
-                const endDate = new Date(end_date);
+                const endDate = parseAsEgyptTime(end_date);
                 endDate.setHours(23, 59, 59, 999);
                 query.timestamp.$lte = endDate;
             }

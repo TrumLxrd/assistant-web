@@ -99,6 +99,66 @@ function displayRecords(records) {
             minute: '2-digit'
         });
 
+        // Check if record is deleted
+        if (record.is_deleted) {
+            const deletedDate = formatDate(record.deleted_at);
+            const deletedTime = new Date(record.deleted_at).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            return `
+                <div class="attendance-record-card deleted-record">
+                    <div class="record-header">
+                        <h4>${record.subject}</h4>
+                        <span class="badge badge-danger">Deleted Record</span>
+                    </div>
+                    <div class="record-details">
+                        <div class="record-detail-item">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                <circle cx="12" cy="10" r="3"></circle>
+                            </svg>
+                            <span>${record.center_name}</span>
+                        </div>
+                        <div class="record-detail-item">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="16" y1="2" x2="16" y2="6"></line>
+                                <line x1="8" y1="2" x2="8" y2="6"></line>
+                                <line x1="3" y1="10" x2="21" y2="10"></line>
+                            </svg>
+                            <span>${recordDate}</span>
+                        </div>
+                        <div class="record-detail-item">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>
+                            <span>Session: ${formatTime(record.start_time)} - ${formatTime(record.end_time)}</span>
+                        </div>
+                        <div class="record-detail-item">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                <line x1="12" y1="9" x2="12" y2="13"></line>
+                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                            </svg>
+                            <span class="deleted-info">Deleted by ${record.deleted_by} on ${deletedDate} at ${deletedTime}</span>
+                        </div>
+                        ${record.deletion_reason ? `
+                        <div class="record-detail-item">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                            <span class="deletion-reason">Reason: ${record.deletion_reason}</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Normal active record
         const delayBadge = record.delay_minutes > 0
             ? `<span class="badge badge-warning">+${record.delay_minutes} min late</span>`
             : '<span class="badge badge-success">On Time</span>';

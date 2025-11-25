@@ -15,6 +15,7 @@ const loadingSpinner = document.getElementById('loading-spinner');
 const attendanceContent = document.getElementById('attendance-content');
 const alertContainer = document.getElementById('alert-container');
 const gpsStatus = document.getElementById('gps-status');
+const requestLocationBtn = document.getElementById('request-location-btn');
 const confirmBtn = document.getElementById('confirm-btn');
 const sessionSubject = document.getElementById('session-subject');
 const sessionCenter = document.getElementById('session-center');
@@ -52,6 +53,7 @@ function updateGPSStatus(status, message, distance = null) {
         gpsStatus.innerHTML = `
       <strong>🔍 ${message}</strong>
     `;
+        requestLocationBtn.style.display = 'none';
     } else if (status === 'valid') {
         gpsStatus.innerHTML = `
       <strong>✅ ${message}</strong>
@@ -59,6 +61,7 @@ function updateGPSStatus(status, message, distance = null) {
     `;
         isWithinRadius = true;
         confirmBtn.disabled = false;
+        requestLocationBtn.style.display = 'none';
     } else if (status === 'invalid') {
         gpsStatus.innerHTML = `
       <strong>❌ ${message}</strong>
@@ -66,6 +69,13 @@ function updateGPSStatus(status, message, distance = null) {
     `;
         isWithinRadius = false;
         confirmBtn.disabled = true;
+
+        // Show request location button if permission was denied
+        if (message.includes('permission denied') || message.includes('GPS')) {
+            requestLocationBtn.style.display = 'block';
+        } else {
+            requestLocationBtn.style.display = 'none';
+        }
     }
 }
 
@@ -185,6 +195,21 @@ confirmBtn.addEventListener('click', async () => {
         confirmBtn.disabled = false;
         confirmBtn.innerHTML = 'Confirm Attendance';
     }
+});
+
+// Handle request location permission button
+requestLocationBtn.addEventListener('click', () => {
+    requestLocationBtn.disabled = true;
+    requestLocationBtn.textContent = 'Requesting...';
+
+    // Try to request location again
+    requestUserLocation();
+
+    // Re-enable button after a short delay
+    setTimeout(() => {
+        requestLocationBtn.disabled = false;
+        requestLocationBtn.textContent = '📍 Request Location Permission';
+    }, 2000);
 });
 
 // Load session on page load

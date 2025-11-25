@@ -3,6 +3,7 @@ const Session = require('../models/Session');
 const Center = require('../models/Center');
 const { calculateDistance } = require('../utils/haversine');
 const { logAuditAction } = require('../utils/auditLogger');
+const { getCurrentEgyptTime, getEgyptTimeDifferenceMinutes } = require('../utils/timezone');
 
 /**
  * Record attendance with GPS validation
@@ -76,25 +77,23 @@ const recordAttendance = async (req, res) => {
             });
         }
 
-        // Calculate delay
-        const now = new Date();
-        const sessionTime = new Date(session.start_time);
+        // Calculate delay using Egypt timezone
+        const now = getCurrentEgyptTime();
+        let sessionTime = new Date(session.start_time);
 
-        // For weekly sessions, set the time to today
+        // For weekly sessions, set the time to today in Egypt timezone
         if (session.recurrence_type === 'weekly') {
-            const today = new Date();
+            const today = getCurrentEgyptTime();
             today.setHours(sessionTime.getHours(), sessionTime.getMinutes(), 0, 0);
-            sessionTime.setTime(today.getTime());
+            sessionTime = today;
         }
 
-        const delayMs = now - sessionTime;
-        const delayMinutes = Math.floor(delayMs / 60000); // Can be negative if early
+        const delayMinutes = getEgyptTimeDifferenceMinutes(now, sessionTime); // Can be negative if early
 
         // Check if attendance is being marked within the allowed time window
         // Allow 30 minutes before and 45 minutes after session start
         const maxEarlyMinutes = 30;
         const maxLateMinutes = 45;
-        const gracePeriodMinutes = 10; // First 10 minutes not counted as late
 
         if (delayMinutes < -maxEarlyMinutes) {
             return res.status(400).json({
@@ -119,10 +118,10 @@ const recordAttendance = async (req, res) => {
             });
         }
 
-        // Calculate actual delay with grace period
-        // If marked early or within 10-minute grace period, delay = 0
-        // Otherwise, delay = actual minutes late - 10 minute grace
-        const actualDelayMinutes = delayMinutes <= gracePeriodMinutes ? 0 : delayMinutes - gracePeriodMinutes;
+        // Calculate actual delay
+        // If marked early or on time, delay = 0
+        // Otherwise, delay = full minutes late
+        const actualDelayMinutes = delayMinutes <= 0 ? 0 : delayMinutes;
 
         // Record attendance
         const newAttendance = new Attendance({
@@ -131,7 +130,7 @@ const recordAttendance = async (req, res) => {
             center_id: session.center_id._id,
             latitude,
             longitude,
-            time_recorded: now,
+            time_recorded: now, // now is already Egypt time
             delay_minutes: actualDelayMinutes,
             notes: notes || ''
         });
@@ -189,13 +188,23 @@ const getMyAttendance = async (req, res) => {
     try {
         const assistantId = req.user.id;
 
-        const records = await Attendance.find({ assistant_id: assistantId })
+        const records = await Attendance.find({
+            assistant_id: assistantId,
+            $or: [
+                { is_deleted: false },
+                { is_deleted: true }
+            ]
+        })
             .populate({
                 path: 'session_id',
                 select: 'subject start_time'
             })
             .populate({
                 path: 'center_id',
+                select: 'name'
+            })
+            .populate({
+                path: 'deleted_by',
                 select: 'name'
             })
             .sort({ time_recorded: -1 })
@@ -216,7 +225,7 @@ const getMyAttendance = async (req, res) => {
             const endHour = (sessionDate.getHours() + 2).toString().padStart(2, '0');
             const endTime = `${endHour}:${minutes}:00`;
 
-            return {
+            const result = {
                 id: record._id,
                 time_recorded: record.time_recorded,
                 delay_minutes: record.delay_minutes,
@@ -226,6 +235,16 @@ const getMyAttendance = async (req, res) => {
                 end_time: endTime,
                 center_name: record.center_id.name
             };
+
+            // Add deletion information if record is deleted
+            if (record.is_deleted) {
+                result.is_deleted = true;
+                result.deleted_by = record.deleted_by?.name || 'Unknown Admin';
+                result.deleted_at = record.deleted_at;
+                result.deletion_reason = record.deletion_reason || 'No reason provided';
+            }
+
+            return result;
         });
 
         res.json({

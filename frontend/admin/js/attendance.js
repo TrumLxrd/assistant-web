@@ -203,7 +203,7 @@ function resetFilters() {
     showAlert('Filters reset');
 }
 
-// Export to Excel
+// Export to Excel (single file with all records)
 function exportToExcel() {
     if (allAttendanceRecords.length === 0) {
         showAlert('No records to export', 'error');
@@ -221,7 +221,8 @@ function exportToExcel() {
             'Date': attendanceDate,
             'Time': attendanceTime,
             'Status': record.delay_minutes === 0 ? 'On Time' : 'Late',
-            'Delay (minutes)': record.delay_minutes || 0
+            'Delay (minutes)': record.delay_minutes || 0,
+            'Notes': record.notes || ''
         };
     });
 
@@ -233,6 +234,81 @@ function exportToExcel() {
     XLSX.writeFile(workbook, filename);
 
     showAlert('Attendance report exported successfully');
+}
+
+// Export individual files per assistant as ZIP
+function exportIndividualToZip() {
+    if (allAttendanceRecords.length === 0) {
+        showAlert('No records to export', 'error');
+        return;
+    }
+
+    // Group records by assistant
+    const recordsByAssistant = {};
+    allAttendanceRecords.forEach(record => {
+        const assistantName = record.assistant_name || 'Unknown';
+        if (!recordsByAssistant[assistantName]) {
+            recordsByAssistant[assistantName] = [];
+        }
+        recordsByAssistant[assistantName].push(record);
+    });
+
+    // Get date range for filename
+    const dateFrom = document.getElementById('filter-date-from').value;
+    const dateTo = document.getElementById('filter-date-to').value;
+    const dateRange = dateFrom && dateTo ? `${dateFrom}_to_${dateTo}` : new Date().toISOString().split('T')[0];
+
+    const zip = new JSZip();
+    let processedCount = 0;
+    const totalAssistants = Object.keys(recordsByAssistant).length;
+
+    // Create Excel file for each assistant and add to ZIP
+    Object.entries(recordsByAssistant).forEach(([assistantName, records]) => {
+        const data = records.map(record => {
+            const attendanceDate = new Date(record.time_recorded).toLocaleDateString();
+            const attendanceTime = new Date(record.time_recorded).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            return {
+                'Assistant': record.assistant_name || 'Unknown',
+                'Session': record.subject || 'N/A',
+                'Center': record.center_name || 'Unknown',
+                'Date': attendanceDate,
+                'Time': attendanceTime,
+                'Status': record.delay_minutes === 0 ? 'On Time' : 'Late',
+                'Delay (minutes)': record.delay_minutes || 0,
+                'Notes': record.notes || ''
+            };
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, `${assistantName} Attendance`);
+
+        // Generate Excel file as array buffer
+        const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+
+        // Sanitize filename (remove special characters)
+        const safeAssistantName = assistantName.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
+        const filename = `${safeAssistantName}_attendance_${dateRange}.xlsx`;
+
+        // Add file to ZIP
+        zip.file(filename, excelBuffer);
+        processedCount++;
+    });
+
+    // Generate and download ZIP file
+    zip.generateAsync({ type: 'blob' }).then(content => {
+        const zipFilename = `individual_attendance_reports_${dateRange}.zip`;
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(content);
+        link.download = zipFilename;
+        link.click();
+
+        showAlert(`Successfully exported ${processedCount} attendance files in ZIP (${totalAssistants} assistants)`);
+    }).catch(error => {
+        console.error('Error creating ZIP file:', error);
+        showAlert('Failed to create ZIP file', 'error');
+    });
 }
 
 // Manual Attendance Modal
@@ -362,6 +438,7 @@ async function handleManualAttendanceSubmit(e) {
 document.getElementById('apply-filters-btn').addEventListener('click', applyFilters);
 document.getElementById('reset-filters-btn').addEventListener('click', resetFilters);
 document.getElementById('export-btn').addEventListener('click', exportToExcel);
+document.getElementById('export-individual-btn').addEventListener('click', exportIndividualToZip);
 
 // Search input with debounce
 let searchTimeout;
