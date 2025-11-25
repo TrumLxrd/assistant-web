@@ -135,6 +135,13 @@ function displayAttendance(records) {
                         </svg>
                         Edit
                     </button>
+                    <button class="btn btn-danger btn-sm delete-attendance-btn" data-id="${record.id}" title="Delete Attendance" style="margin-left: 0.5rem;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18"></path>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                        Delete
+                    </button>
                 </td>
             </tr>
         `;
@@ -469,6 +476,12 @@ document.getElementById('attendance-table').addEventListener('click', (e) => {
         const attendanceId = button.getAttribute('data-id');
         openEditAttendanceModal(attendanceId);
     }
+
+    if (e.target.closest('.delete-attendance-btn')) {
+        const button = e.target.closest('.delete-attendance-btn');
+        const attendanceId = button.getAttribute('data-id');
+        confirmDeleteAttendance(attendanceId);
+    }
 });
 
 document.getElementById('close-edit-modal').addEventListener('click', closeEditAttendanceModal);
@@ -610,6 +623,25 @@ async function handleEditAttendanceSubmit(e) {
     } finally {
         saveBtn.disabled = false;
         saveBtn.textContent = originalText;
+    }
+}
+
+// Delete attendance confirmation and execution
+async function confirmDeleteAttendance(attendanceId) {
+    if (!confirm('Are you sure you want to delete this attendance record? This action cannot be undone.')) {
+        return;
+    }
+
+    try {
+        const response = await window.api.makeRequest('DELETE', `/admin/attendance/${attendanceId}`);
+
+        if (response.success) {
+            showAlert(response.message || 'Attendance record deleted successfully', 'success');
+            // Refresh attendance records
+            loadAttendance(currentFilters, currentPage);
+        }
+    } catch (error) {
+        showAlert(error.message || 'Failed to delete attendance record', 'error');
     }
 }
 

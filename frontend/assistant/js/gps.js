@@ -96,9 +96,11 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 
 /**
- * Request user's GPS location
+ * Request user's GPS location with retry logic
  */
-function requestLocation(onSuccess, onError) {
+function requestLocation(onSuccess, onError, retryCount = 0) {
+    const maxRetries = 2;
+
     if (!navigator.geolocation) {
         onError('Geolocation is not supported by your browser');
         return;
@@ -111,6 +113,13 @@ function requestLocation(onSuccess, onError) {
             onSuccess(lat, lng);
         },
         (error) => {
+            // Retry on timeout if we haven't exceeded max retries
+            if (error.code === error.TIMEOUT && retryCount < maxRetries) {
+                console.log(`Location timeout, retrying... (attempt ${retryCount + 2}/${maxRetries + 1})`);
+                requestLocation(onSuccess, onError, retryCount + 1);
+                return;
+            }
+
             let message = 'Unable to get your location';
             switch (error.code) {
                 case error.PERMISSION_DENIED:
@@ -120,14 +129,14 @@ function requestLocation(onSuccess, onError) {
                     message = 'Location information unavailable.';
                     break;
                 case error.TIMEOUT:
-                    message = 'Location request timed out.';
+                    message = 'Location request timed out. Please try again.';
                     break;
             }
             onError(message);
         },
         {
             enableHighAccuracy: true,
-            timeout: 10000,
+            timeout: 30000, // Increased from 10s to 30s
             maximumAge: 0
         }
     );

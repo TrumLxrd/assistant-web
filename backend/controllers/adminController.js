@@ -639,14 +639,25 @@ const getAttendanceRecords = async (req, res) => {
  */
 const recordAttendanceManually = async (req, res) => {
     try {
-        const { assistant_id, session_id, center_id, delay_minutes = 0, notes = '' } = req.body;
+        const { assistant_id, session_id, delay_minutes = 0, notes = '' } = req.body;
 
-        if (!assistant_id || !session_id || !center_id) {
+        if (!assistant_id || !session_id) {
             return res.status(400).json({
                 success: false,
-                message: 'Assistant, session, and center are required'
+                message: 'Assistant and session are required'
             });
         }
+
+        // Get session to extract center_id
+        const session = await Session.findById(session_id).lean();
+        if (!session) {
+            return res.status(404).json({
+                success: false,
+                message: 'Session not found'
+            });
+        }
+
+        const center_id = session.center_id;
 
         // Check if attendance already exists
         const existing = await Attendance.findOne({

@@ -91,9 +91,10 @@ const recordAttendance = async (req, res) => {
         const delayMinutes = Math.floor(delayMs / 60000); // Can be negative if early
 
         // Check if attendance is being marked within the allowed time window
-        // Allow 45 minutes before and 45 minutes after session start (90-minute window)
-        const maxEarlyMinutes = 45;
+        // Allow 30 minutes before and 45 minutes after session start
+        const maxEarlyMinutes = 30;
         const maxLateMinutes = 45;
+        const gracePeriodMinutes = 10; // First 10 minutes not counted as late
 
         if (delayMinutes < -maxEarlyMinutes) {
             return res.status(400).json({
@@ -118,8 +119,10 @@ const recordAttendance = async (req, res) => {
             });
         }
 
-        // Calculate actual delay (0 if marked early, positive if late)
-        const actualDelayMinutes = Math.max(0, delayMinutes);
+        // Calculate actual delay with grace period
+        // If marked early or within 10-minute grace period, delay = 0
+        // Otherwise, delay = actual minutes late - 10 minute grace
+        const actualDelayMinutes = delayMinutes <= gracePeriodMinutes ? 0 : delayMinutes - gracePeriodMinutes;
 
         // Record attendance
         const newAttendance = new Attendance({

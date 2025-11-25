@@ -84,7 +84,7 @@ const getTodaySessions = async (req, res) => {
 
             const timeDiffMs = now - sessionStartTime;
             const timeDiffMinutes = Math.floor(timeDiffMs / 60000);
-            const canMarkAttendance = !attendance && timeDiffMinutes >= -45 && timeDiffMinutes <= 45;
+            const canMarkAttendance = !attendance && timeDiffMinutes >= -30 && timeDiffMinutes <= 45;
 
             return {
                 id: session._id,

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#6366f1">
+    <title>My Attendance History - Attendance System</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="../shared/css/common.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <header class="header">
+        <div class="header-content">
+            <h1>📊 My Attendance History</h1>
+            <div class="user-info">
+                <span id="user-name">Loading...</span>
+                <a href="sessions.html" class="btn logout-btn" style="margin-right: 0.5rem;">← Sessions</a>
+                <button class="btn logout-btn" id="logout-btn">Logout</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div class="page-title">
+            <h2>My Attendance History</h2>
+            <p class="subtitle">View your attendance records</p>
+        </div>
+
+        <div id="alert-container"></div>
+
+        <!-- Filters -->
+        <div class="card" style="margin-bottom: 2rem;">
+            <h3 style="margin-bottom: 1rem;">Filters</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                <div class="form-group" style="margin: 0;">
+                    <label class="form-label">Date From</label>
+                    <input type="date" id="filter-date-from" class="form-input">
+                </div>
+                <div class="form-group" style="margin: 0;">
+                    <label class="form-label">Date To</label>
+                    <input type="date" id="filter-date-to" class="form-input">
+                </div>
+            </div>
+            <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+                <button class="btn btn-primary" id="apply-filters-btn">Apply Filters</button>
+                <button class="btn btn-outline" id="reset-filters-btn">Reset</button>
+            </div>
+        </div>
+
+        <div id="loading-spinner" class="spinner"></div>
+
+        <!-- Attendance Records -->
+        <div id="records-container" style="display: none;">
+            <div class="card">
+                <h3 style="margin-bottom: 1.5rem;">Attendance Records (<span id="records-count">0</span>)</h3>
+                <div id="attendance-list"></div>
+            </div>
+        </div>
+
+        <div id="empty-state" class="empty-state" style="display: none;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+            <h3>No Attendance Records</h3>
+            <p>You haven't marked any attendance yet.</p>
+        </div>
+    </main>
+
+    <!-- Scripts -->
+    <script src="../shared/js/api.js"></script>
+    <script src="js/attendance-history.js"></script>
+</body>
+
+</html>

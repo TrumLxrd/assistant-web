@@ -60,6 +60,7 @@ router.get('/attendance', getAttendanceRecords);
 router.get('/attendance/:id', getAttendanceById);
 router.post('/attendance/manual', recordAttendanceManually);
 router.put('/attendance/:id', updateAttendance);
+router.delete('/attendance/:id', clearAttendance);
 router.delete('/attendance/clear', clearAttendance);
 
 // Audit logs
