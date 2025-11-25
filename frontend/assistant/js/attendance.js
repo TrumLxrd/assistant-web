@@ -202,14 +202,63 @@ requestLocationBtn.addEventListener('click', () => {
     requestLocationBtn.disabled = true;
     requestLocationBtn.textContent = 'Requesting...';
 
-    // Try to request location again
-    requestUserLocation();
+    // Try to request location permission again
+    window.gps.requestLocation(
+        (lat, lng) => {
+            // Success! Update the UI
+            window.gps.updateUserMarker(lat, lng);
 
-    // Re-enable button after a short delay
-    setTimeout(() => {
-        requestLocationBtn.disabled = false;
-        requestLocationBtn.textContent = '📍 Request Location Permission';
-    }, 2000);
+            // Calculate distance
+            const distance = window.gps.calculateDistance(
+                currentSession.latitude,
+                currentSession.longitude,
+                lat,
+                lng
+            );
+
+            const distanceRounded = Math.round(distance);
+
+            // Check if within radius
+            if (distance <= currentSession.radius_m) {
+                updateGPSStatus(
+                    'valid',
+                    'You are inside the center!',
+                    distanceRounded
+                );
+                showAlert('✅ Location permission granted! You can now mark attendance.', 'success');
+            } else {
+                updateGPSStatus(
+                    'invalid',
+                    `You are outside the center area. Please move closer.`,
+                    distanceRounded
+                );
+            }
+        },
+        (error) => {
+            // Still denied - offer to reload the page
+            updateGPSStatus('invalid', error);
+
+            // Show reload option if permission is still denied
+            if (error.includes('permission denied') || error.includes('GPS')) {
+                const reloadConfirm = confirm(
+                    '🔄 GPS permission is still blocked.\n\n' +
+                    'Would you like to reload the page to try again?\n\n' +
+                    '(This gives your browser a fresh chance to ask for permission)'
+                );
+
+                if (reloadConfirm) {
+                    window.location.reload();
+                } else {
+                    requestLocationBtn.disabled = false;
+                    requestLocationBtn.textContent = '🔄 Try Again - Request GPS Permission';
+                }
+            } else {
+                // For other errors, just re-enable the button
+                requestLocationBtn.disabled = false;
+                requestLocationBtn.textContent = '🔄 Try Again - Request GPS Permission';
+            }
+        }
+    );
 });
 
 // Load session on page load
