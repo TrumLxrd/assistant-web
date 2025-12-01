@@ -1,7 +1,7 @@
 # 🎯 Assistant Attendance System
 
 ## Overview
-A premium, GPS‑based attendance tracking system for educational assistants. It features real‑time location validation, a sleek admin dashboard, and a PWA assistant interface.
+A premium, GPS‑based attendance tracking system for educational assistants. It features real‑time location validation, a sleek admin dashboard, and a PWA assistant interface..
 
 ---
 
