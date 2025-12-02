@@ -746,8 +746,9 @@ const recordAttendanceManually = async (req, res) => {
 
         const delayMinutes = getEgyptTimeDifferenceMinutes(recordedTime, sessionTime);
 
-        // Calculate actual delay (same as regular attendance - full delay time)
-        const actualDelayMinutes = delayMinutes <= 0 ? 0 : delayMinutes;
+        // Round to nearest minute and keep positive values
+        const roundedDelay = Math.round(delayMinutes);
+        const actualDelayMinutes = roundedDelay <= 0 ? 0 : roundedDelay;
 
         const newAttendance = new Attendance({
             assistant_id,
@@ -1180,16 +1181,24 @@ const deleteUser = async (req, res) => {
 const changeUserPassword = async (req, res) => {
     try {
         const { id } = req.params;
-        const { new_password } = req.body;
+        // Accept either `new_password` (older API) or `password` (frontend)
+        const newPassword = req.body.new_password || req.body.password || req.body.newPassword || req.body.newpassword;
 
-        if (!new_password) {
+        if (!newPassword) {
             return res.status(400).json({
                 success: false,
                 message: 'New password is required'
             });
         }
 
-        const passwordHash = await bcrypt.hash(new_password, 10);
+        if (typeof newPassword !== 'string' || newPassword.length < 6) {
+            return res.status(400).json({
+                success: false,
+                message: 'Password must be at least 6 characters long'
+            });
+        }
+
+        const passwordHash = await bcrypt.hash(newPassword, 10);
 
         const updatedUser = await User.findByIdAndUpdate(
             id,

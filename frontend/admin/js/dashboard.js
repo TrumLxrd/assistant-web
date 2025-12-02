@@ -73,8 +73,7 @@ async function loadDashboardStats() {
             // Load recent attendance
             loadRecentAttendance(stats.recentAttendance || []);
 
-            // Load activity timeline
-            loadActivityTimeline();
+            // Activity timeline removed
         }
     } catch (error) {
         console.error('Error loading dashboard:', error);
@@ -82,63 +81,7 @@ async function loadDashboardStats() {
     }
 }
 
-// Load activity timeline (mock data for now - in real app, this would come from API)
-function loadActivityTimeline() {
-    const timelineContainer = document.getElementById('activity-timeline');
-
-    // Mock activity data - replace with real API call
-    const activities = [
-        {
-            icon: 'user-plus',
-            title: 'New assistant registered',
-            time: '2 minutes ago',
-            type: 'user'
-        },
-        {
-            icon: 'calendar',
-            title: 'Session completed at Cairo Center',
-            time: '15 minutes ago',
-            type: 'session'
-        },
-        {
-            icon: 'database',
-            title: 'Backup completed successfully',
-            time: '1 hour ago',
-            type: 'backup'
-        },
-        {
-            icon: 'user-check',
-            title: 'Attendance marked for Mathematics session',
-            time: '2 hours ago',
-            type: 'attendance'
-        }
-    ];
-
-    timelineContainer.innerHTML = activities.map((activity, index) => `
-        <div class="timeline-item" style="animation-delay: ${index * 0.1}s">
-            <div class="timeline-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    ${getActivityIcon(activity.icon)}
-                </svg>
-            </div>
-            <div class="timeline-content">
-                <div class="timeline-title">${activity.title}</div>
-                <div class="timeline-meta">${activity.time}</div>
-            </div>
-        </div>
-    `).join('');
-}
-
-// Get activity icon SVG path
-function getActivityIcon(iconType) {
-    const icons = {
-        'user-plus': '<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line>',
-        'calendar': '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line>',
-        'database': '<ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>',
-        'user-check': '<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><polyline points="17 11 19 13 23 9"></polyline>'
-    };
-    return icons[iconType] || icons['user-check'];
-}
+// Activity timeline removed — no-op placeholder left intentionally
 
 // Load recent attendance
 function loadRecentAttendance(attendanceRecords) {

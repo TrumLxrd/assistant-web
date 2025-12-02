@@ -123,6 +123,9 @@ const recordAttendance = async (req, res) => {
 
         const delayMinutes = getEgyptTimeDifferenceMinutes(now, sessionTime); // Can be negative if early
 
+        // Round to nearest whole minute and normalize
+        const roundedDelay = Math.round(delayMinutes);
+
         // Check if attendance is being marked within the allowed time window
         // Allow 30 minutes before and 45 minutes after session start
         const maxEarlyMinutes = 30;
@@ -154,7 +157,7 @@ const recordAttendance = async (req, res) => {
         // Calculate actual delay
         // If marked early or on time, delay = 0
         // Otherwise, delay = full minutes late
-        const actualDelayMinutes = delayMinutes <= 0 ? 0 : delayMinutes;
+        const actualDelayMinutes = roundedDelay <= 0 ? 0 : roundedDelay;
 
         // Record attendance
         const newAttendance = new Attendance({
@@ -189,7 +192,7 @@ const recordAttendance = async (req, res) => {
             session_id,
             center_id: session.center_id._id.toString(),
             subject: session.subject,
-            delay_minutes: delayMinutes,
+            delay_minutes: actualDelayMinutes,
             distance: Math.round(distance)
         });
 
