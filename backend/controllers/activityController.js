@@ -1089,6 +1089,91 @@ const createActivityLog = async (req, res) => {
 
         await newLog.save();
 
+        // Create attendance record for the activity log
+        try {
+            // Get assistant's assigned centers
+            const assistant = await User.findById(user_id).select('assignedCenters').lean();
+            const firstCenter = assistant?.assignedCenters && assistant.assignedCenters.length > 0 
+                ? assistant.assignedCenters[0] 
+                : null;
+
+            let sessionSubject = null;
+            let callSessionId = null;
+            let delayMinutes = 0;
+
+            if (type === 'call' && call_session_id) {
+                // For call sessions, get the call session name
+                const callSession = await CallSession.findById(call_session_id).lean();
+                if (callSession) {
+                    sessionSubject = callSession.name;
+                    callSessionId = call_session_id;
+                    
+                    // Calculate delay based on call session start time
+                    const callDate = moment.tz(callSession.date, 'Africa/Cairo');
+                    const [hours, minutes] = callSession.start_time.split(':');
+                    callDate.hours(parseInt(hours));
+                    callDate.minutes(parseInt(minutes));
+                    callDate.seconds(0);
+                    callDate.milliseconds(0);
+                    const sessionTime = callDate.toDate();
+                    
+                    const calculatedDelay = getEgyptTimeDifferenceMinutes(newLog.start_time, sessionTime);
+                    delayMinutes = calculatedDelay <= 0 ? 0 : Math.round(calculatedDelay);
+                }
+            } else if (type === 'whatsapp') {
+                // For WhatsApp, create a descriptive subject
+                const startTimeStr = moment.tz(newLog.start_time, 'Africa/Cairo').format('HH:mm');
+                const endTimeStr = newLog.end_time 
+                    ? moment.tz(newLog.end_time, 'Africa/Cairo').format('HH:mm')
+                    : 'Ongoing';
+                sessionSubject = `WhatsApp Activity - ${startTimeStr} to ${endTimeStr}`;
+                delayMinutes = 0; // Manual records, no delay calculation
+            } else if (type === 'call') {
+                // For manual call records without call_session_id
+                const startTimeStr = moment.tz(newLog.start_time, 'Africa/Cairo').format('HH:mm');
+                const endTimeStr = newLog.end_time 
+                    ? moment.tz(newLog.end_time, 'Africa/Cairo').format('HH:mm')
+                    : 'Ongoing';
+                sessionSubject = `Call Activity - ${startTimeStr} to ${endTimeStr}`;
+                delayMinutes = 0; // Manual records, no delay calculation
+            }
+
+            // Check if attendance already exists
+            const existingAttendance = await Attendance.findOne({
+                assistant_id: user_id,
+                ...(callSessionId ? { call_session_id: callSessionId } : { 
+                    session_id: null,
+                    call_session_id: null,
+                    session_subject: sessionSubject,
+                    time_recorded: {
+                        $gte: moment.tz(newLog.start_time, 'Africa/Cairo').startOf('day').toDate(),
+                        $lt: moment.tz(newLog.start_time, 'Africa/Cairo').add(1, 'day').startOf('day').toDate()
+                    }
+                })
+            });
+
+            if (!existingAttendance && sessionSubject) {
+                const attendance = new Attendance({
+                    assistant_id: user_id,
+                    session_id: null,
+                    call_session_id: callSessionId || null,
+                    session_subject: sessionSubject,
+                    center_id: firstCenter,
+                    latitude: null, // No GPS required for remote activities
+                    longitude: null,
+                    time_recorded: newLog.start_time,
+                    delay_minutes: delayMinutes,
+                    notes: notes || `Manual ${type} activity record`
+                });
+
+                await attendance.save();
+            }
+        } catch (attendanceError) {
+            // Log error but don't fail the activity log creation
+            console.error('Error creating attendance record for activity log:', attendanceError);
+            await logError(req.user.id, 'CREATE_ACTIVITY_LOG_ATTENDANCE', attendanceError);
+        }
+
         await logAuditAction(req.user.id, 'CREATE_ACTIVITY_LOG', {
             log_id: newLog._id.toString(),
             user_id,
