@@ -268,12 +268,12 @@ body {
     padding: 2rem;
     width: calc(100% - 280px);
     min-height: 100vh;
-    transition: margin-left 0.3s ease, width 0.3s ease;
+    transition: none;
 }
 
 .sidebar-collapsed .main-content {
-    margin-left: 0;
-    width: 100%;
+    margin-left: 280px;
+    width: calc(100% - 280px);
 }
 
 .top-bar {
@@ -1292,7 +1292,7 @@ body {
         width: 240px;
     }
 
-    body:not(.sidebar-collapsed) .main-content {
+    .main-content {
         margin-left: 240px;
         width: calc(100% - 240px);
     }
