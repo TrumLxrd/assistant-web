@@ -7,7 +7,7 @@ const jwtConfig = require('../config/jwt');
  */
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    const token = (authHeader && authHeader.split(' ')[1]) || req.query.token; // Bearer TOKEN or ?token=...
 
     if (!token) {
         return res.status(401).json({

@@ -36,7 +36,6 @@
         <div class="card" style="margin-bottom: 2rem;">
             <div class="tabs">
                 <button class="tab-btn active" data-tab="whatsapp">WhatsApp Schedules</button>
-                <button class="tab-btn" data-tab="calls">Call Sessions</button>
             </div>
         </div>
 
@@ -80,46 +79,7 @@
             </div>
         </div>
 
-        <!-- Call Sessions Tab -->
-        <div id="calls-tab" class="tab-content" style="display: none;">
-            <div class="card" style="margin-bottom: 2rem;">
-                <div class="section-header">
-                    <h2>Call Sessions</h2>
-                    <button class="btn btn-primary" id="add-call-btn">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <line x1="12" y1="5" x2="12" y2="19"></line>
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                        </svg>
-                        Add Call Session
-                    </button>
-                </div>
 
-                <div class="table-container">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Date</th>
-                                <th>Start Time</th>
-                                <th>End Time</th>
-                                <th>Status</th>
-                                <th>Assistants</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="calls-table">
-                            <tr>
-                                <td colspan="6" class="text-center">
-                                    <div class="loading-spinner"></div>
-                                    Loading call sessions...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- Add/Edit WhatsApp Schedule Modal -->
@@ -179,46 +139,7 @@
         </div>
     </div>
 
-    <!-- Add/Edit Call Session Modal -->
-    <div class="modal-overlay" id="call-modal">
-        <div class="modal" style="max-width: 600px;">
-            <div class="modal-header">
-                <h3 id="call-modal-title">Add Call Session</h3>
-                <button class="modal-close" id="close-call-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="call-form">
-                    <input type="hidden" id="call-id">
 
-                    <div class="form-group">
-                        <label class="form-label">Name *</label>
-                        <input type="text" id="call-name" class="form-input" required placeholder="e.g., Morning Calls">
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Date *</label>
-                        <input type="date" id="call-date" class="form-input" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Start Time *</label>
-                        <input type="time" id="call-start-time" class="form-input" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">End Time (Optional)</label>
-                        <input type="datetime-local" id="call-end-time" class="form-input" 
-                               placeholder="Leave empty for manual end">
-                        <small class="form-help">If set, session will automatically end at this time</small>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-outline" id="cancel-call-btn">Cancel</button>
-                <button type="submit" form="call-form" class="btn btn-primary" id="save-call-btn">Save Session</button>
-            </div>
-        </div>
-    </div>
 
     <!-- Delete Confirmation Modal -->
     <div class="modal-overlay" id="delete-modal">

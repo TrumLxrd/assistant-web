@@ -1,5 +1,6 @@
 const WhatsAppSchedule = require('../models/WhatsAppSchedule');
 const CallSession = require('../models/CallSession');
+const CallSessionStudent = require('../models/CallSessionStudent');
 const ActivityLog = require('../models/ActivityLog');
 const Attendance = require('../models/Attendance');
 const User = require('../models/User');
@@ -300,7 +301,7 @@ const getCallSessions = async (req, res) => {
             const dateMoment = moment.tz(session.date, 'Africa/Cairo');
             const assistants = session.assistants || [];
             const assistantNames = assistants.map(a => a.name || 'Unknown').filter(Boolean);
-            
+
             return {
                 id: session._id,
                 name: session.name,
@@ -353,7 +354,22 @@ const getCallSessionById = async (req, res) => {
         const dateMoment = moment.tz(session.date, 'Africa/Cairo');
         const assistants = session.assistants || [];
         const assistantNames = assistants.map(a => a.name || 'Unknown').filter(Boolean);
-        
+
+        // Calculate stats
+        const totalStudents = await CallSessionStudent.countDocuments({ call_session_id: id });
+        const globalCompleted = await CallSessionStudent.countDocuments({
+            call_session_id: id,
+            filter_status: { $ne: '' }
+        });
+        const remainingStudents = totalStudents - globalCompleted;
+
+        // Calculate user-specific completed count
+        const userCompleted = await CallSessionStudent.countDocuments({
+            call_session_id: id,
+            filter_status: { $ne: '' },
+            assigned_to: req.user.id
+        });
+
         const formattedSession = {
             id: session._id,
             name: session.name,
@@ -366,7 +382,12 @@ const getCallSessionById = async (req, res) => {
             assistant_names: assistantNames,
             end_time: session.end_time,
             created_at: session.createdAt,
-            updated_at: session.updatedAt
+            updated_at: session.updatedAt,
+            stats: {
+                total: totalStudents,
+                completed: userCompleted,
+                remaining: remainingStudents
+            }
         };
 
         res.json({
@@ -431,20 +452,20 @@ const updateCallSession = async (req, res) => {
             const now = getCurrentEgyptTime();
             const endTimeMoment = moment.tz(updatedSession.end_time, 'Africa/Cairo');
             const nowMoment = moment.tz(now, 'Africa/Cairo');
-            
+
             // If end_time has passed, auto-end the session
             if (endTimeMoment.isSameOrBefore(nowMoment)) {
                 updatedSession.status = 'completed';
                 // Use the set end_time, not current time
                 updatedSession.end_time = updatedSession.end_time;
                 await updatedSession.save();
-                
+
                 // Update all related activity logs with end_time and calculate duration
                 const activityLogs = await ActivityLog.find({
                     call_session_id: id,
                     end_time: null
                 });
-                
+
                 for (const log of activityLogs) {
                     log.end_time = updatedSession.end_time;
                     // Calculate duration
@@ -553,7 +574,7 @@ const startCallSession = async (req, res) => {
                 message: 'Call session is already completed'
             });
         }
-        
+
         // Check if assistant is already in the session
         const assistants = session.assistants || [];
         const assistantIdStr = assistantId.toString();
@@ -562,7 +583,7 @@ const startCallSession = async (req, res) => {
             return aidStr === assistantIdStr;
         });
         const isFirstAssistant = session.assistant_id && session.assistant_id.toString() === assistantIdStr;
-        
+
         if (isAlreadyJoined || isFirstAssistant) {
             return res.status(400).json({
                 success: false,
@@ -586,7 +607,7 @@ const startCallSession = async (req, res) => {
         if (session.status === 'pending') {
             session.status = 'active';
         }
-        
+
         // Add assistant to assistants array if not already present
         if (!session.assistants) {
             session.assistants = [];
@@ -599,12 +620,12 @@ const startCallSession = async (req, res) => {
         if (!isAlreadyInArray) {
             session.assistants.push(assistantId);
         }
-        
+
         // Keep assistant_id for backward compatibility (first assistant)
         if (!session.assistant_id) {
             session.assistant_id = assistantId;
         }
-        
+
         await session.save();
 
         // Create activity log
@@ -628,8 +649,8 @@ const startCallSession = async (req, res) => {
         try {
             // Get assistant's assigned centers
             const assistant = await User.findById(assistantId).select('assignedCenters').lean();
-            const firstCenter = assistant?.assignedCenters && assistant.assignedCenters.length > 0 
-                ? assistant.assignedCenters[0] 
+            const firstCenter = assistant?.assignedCenters && assistant.assignedCenters.length > 0
+                ? assistant.assignedCenters[0]
                 : null;
 
             // Calculate delay minutes (when assistant joined vs session start time)
@@ -727,7 +748,7 @@ const stopCallSession = async (req, res) => {
             const assistants = session.assistants || [];
             const isInAssistants = assistants.some(aid => aid.toString() === userId.toString());
             const isFirstAssistant = session.assistant_id && session.assistant_id.toString() === userId.toString();
-            
+
             if (!isInAssistants && !isFirstAssistant) {
                 return res.status(403).json({
                     success: false,
@@ -737,7 +758,7 @@ const stopCallSession = async (req, res) => {
         }
 
         const now = getCurrentEgyptTime();
-        
+
         // Use scheduled end_time if set, otherwise use current time
         const endTime = session.end_time || now;
 
@@ -764,7 +785,7 @@ const stopCallSession = async (req, res) => {
 
         await logAuditAction(userId, 'STOP_CALL_SESSION', {
             session_id: id,
-            activity_log_id: activityLog?._id?.toString() || null
+            // activity_log_id: null // Removed singular reference
         });
 
         res.json({
@@ -772,7 +793,7 @@ const stopCallSession = async (req, res) => {
             message: 'Call session stopped successfully',
             data: {
                 session_id: session._id,
-                duration_minutes: activityLog?.duration_minutes || 0
+                duration_minutes: 0 // Cannot determine single duration for session easily here
             }
         });
     } catch (error) {
@@ -781,6 +802,303 @@ const stopCallSession = async (req, res) => {
             success: false,
             message: 'Error stopping call session',
             error: error.message
+        });
+    }
+};
+
+// ============================================
+// Call Session Student CRUD
+// ============================================
+
+/**
+ * Assign Next Available Student
+ * POST /api/activities/call-sessions/:id/assign
+ */
+const assignNextStudent = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        const LOCK_TIMEOUT_MINUTES = 15;
+
+        const session = await CallSession.findById(id);
+        if (!session) {
+            return res.status(404).json({ success: false, message: 'Session not found' });
+        }
+
+        // 1. Check if user already has an assigned, unfinished student
+        const currentAssignment = await CallSessionStudent.findOne({
+            call_session_id: id,
+            assigned_to: userId,
+            filter_status: '' // Not completed
+        });
+
+        if (currentAssignment) {
+            // Refresh lock
+            currentAssignment.assigned_at = new Date();
+            await currentAssignment.save();
+
+            return res.json({
+                success: true,
+                formattedData: {
+                    id: currentAssignment._id,
+                    name: currentAssignment.name,
+                    studentPhone: currentAssignment.student_phone,
+                    parentPhone: currentAssignment.parent_phone,
+                    filterStatus: currentAssignment.filter_status,
+                    comments: currentAssignment.comments,
+                    howMany: currentAssignment.how_many,
+                    totalTest: currentAssignment.total_test
+                },
+                message: 'Continued with currently assigned student'
+            });
+        }
+
+        // 2. Find next available student
+        // Criteria: Not completed (filter_status empty) AND (Unassigned OR Lock expired)
+        const lockThreshold = new Date(Date.now() - LOCK_TIMEOUT_MINUTES * 60000);
+
+        const nextStudent = await CallSessionStudent.findOneAndUpdate(
+            {
+                call_session_id: id,
+                filter_status: '',
+                $or: [
+                    { assigned_to: null },
+                    { assigned_at: { $lt: lockThreshold } }
+                ]
+            },
+            {
+                $set: {
+                    assigned_to: userId,
+                    assigned_at: new Date()
+                }
+            },
+            { new: true, sort: { name: 1 } } // Sort alphabetically or by _id
+        );
+
+        if (!nextStudent) {
+            return res.json({
+                success: true,
+                data: null,
+                message: 'No more students available'
+            });
+        }
+
+        // Calculate stats
+        // Calculate stats
+        const totalStudents = await CallSessionStudent.countDocuments({ call_session_id: id });
+        const globalCompleted = await CallSessionStudent.countDocuments({
+            call_session_id: id,
+            filter_status: { $ne: '' }
+        });
+        const remainingStudents = totalStudents - globalCompleted;
+
+        // Calculate user-specific completed count
+        const userCompleted = await CallSessionStudent.countDocuments({
+            call_session_id: id,
+            filter_status: { $ne: '' },
+            assigned_to: req.user.id
+        });
+
+        const formattedStudent = {
+            id: nextStudent._id,
+            name: nextStudent.name,
+            studentPhone: nextStudent.student_phone,
+            parentPhone: nextStudent.parent_phone,
+            filterStatus: nextStudent.filter_status,
+            comments: nextStudent.comments,
+            howMany: nextStudent.how_many,
+            totalTest: nextStudent.total_test
+        };
+
+        res.json({
+            success: true,
+            data: formattedStudent,
+            stats: {
+                total: totalStudents,
+                completed: userCompleted,
+                remaining: remainingStudents
+            },
+            message: 'New student assigned'
+        });
+
+    } catch (error) {
+        console.error('Assign student error:', error);
+        await logError(error, {
+            action: 'assignNextStudent',
+            sessionId: req.params.id
+        }, req);
+
+        res.status(500).json({ success: false, message: 'Error assigning student' });
+    }
+};
+
+/**
+ * Import Call Session Students
+ * POST /api/activities/call-sessions/:id/students
+ */
+const importCallSessionStudents = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { students } = req.body; // Expecting array of { name, studentPhone, parentPhone }
+
+        if (!students || !Array.isArray(students) || students.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No students provided'
+            });
+        }
+
+        const session = await CallSession.findById(id);
+        if (!session) {
+            return res.status(404).json({
+                success: false,
+                message: 'Call session not found'
+            });
+        }
+
+        // Create student records
+        const studentRecords = students.map(student => ({
+            call_session_id: id,
+            name: student.name,
+            student_phone: student.studentPhone || '',
+            parent_phone: student.parentPhone || ''
+        }));
+
+        await CallSessionStudent.insertMany(studentRecords);
+
+        await logAuditAction(req.user.id, 'IMPORT_CALL_SESSION_STUDENTS', {
+            session_id: id,
+            count: students.length
+        });
+
+        res.status(201).json({
+            success: true,
+            message: `${students.length} students imported successfully`
+        });
+    } catch (error) {
+        console.error('Import students error:', error);
+        await logError(error, {
+            action: 'importCallSessionStudents',
+            sessionId: req.params.id,
+            data: req.body
+        }, req);
+
+        res.status(500).json({
+            success: false,
+            message: 'Error importing students',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get Call Session Students
+ * GET /api/activities/call-sessions/:id/students
+ */
+const getCallSessionStudents = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { assigned_to, has_status, limit, offset } = req.query;
+
+        let query = { call_session_id: id };
+
+        // Filter by assigned user
+        if (assigned_to === 'me') {
+            query.assigned_to = req.user.id;
+        } else if (assigned_to) {
+            query.assigned_to = assigned_to;
+        }
+
+        // Filter by status (completed/processed)
+        if (has_status === 'true') {
+            query.filter_status = { $ne: '' };
+        }
+
+        // Build Query
+        let dbQuery = CallSessionStudent.find(query)
+            .populate('last_called_by', 'name')
+            .populate('assigned_to', 'name')
+            // Sort by updated time desc for history (most recent first)
+            // If just listing all, maybe name asc? Let's check context.
+            // If history mode (has_status=true), we usually want most recent first.
+            .sort(has_status === 'true' ? { updatedAt: -1 } : { name: 1 });
+
+        if (limit) dbQuery = dbQuery.limit(parseInt(limit));
+        if (offset) dbQuery = dbQuery.skip(parseInt(offset));
+
+        const students = await dbQuery.lean();
+
+        const formattedStudents = students.map(s => ({
+            id: s._id,
+            name: s.name,
+            studentPhone: s.student_phone,
+            parentPhone: s.parent_phone,
+            filterStatus: s.filter_status,
+            comments: s.comments,
+            howMany: s.how_many,
+            totalTest: s.total_test,
+            lastCalledBy: s.last_called_by?.name || null,
+            assignedTo: s.assigned_to?.name || null,
+            assignedAt: s.assigned_at
+        }));
+
+        res.json({
+            success: true,
+            data: formattedStudents
+        });
+    } catch (error) {
+        console.error('Get students error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching students'
+        });
+    }
+};
+
+/**
+ * Update Call Session Student
+ * PUT /api/activities/call-sessions/students/:studentId
+ */
+const updateCallSessionStudent = async (req, res) => {
+    try {
+        const { studentId } = req.params;
+        const { filterStatus, comment, howMany, totalTest } = req.body;
+        const userId = req.user.id; // Get current user ID
+
+        const student = await CallSessionStudent.findById(studentId);
+        if (!student) {
+            return res.status(404).json({
+                success: false,
+                message: 'Student not found'
+            });
+        }
+
+        // Track who updated this student last
+        student.last_called_by = userId;
+
+        if (filterStatus !== undefined) student.filter_status = filterStatus;
+        if (howMany !== undefined) student.how_many = howMany;
+        if (totalTest !== undefined) student.total_test = totalTest;
+
+        if (comment) {
+            student.comments.push({
+                text: comment,
+                timestamp: new Date(),
+                author: req.user.name || 'Assistant' // Optional: store name directly for easier display
+            });
+        }
+
+        await student.save();
+
+        res.json({
+            success: true,
+            message: 'Student updated successfully'
+        });
+    } catch (error) {
+        console.error('Update student error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error updating student'
         });
     }
 };
@@ -856,8 +1174,8 @@ const generateWhatsAppRecordsForDate = async (targetDate) => {
             try {
                 // Get user's assigned centers
                 const user = await User.findById(schedule.user_id).select('assignedCenters').lean();
-                const firstCenter = user?.assignedCenters && user.assignedCenters.length > 0 
-                    ? user.assignedCenters[0] 
+                const firstCenter = user?.assignedCenters && user.assignedCenters.length > 0
+                    ? user.assignedCenters[0]
                     : null;
 
                 // Check if attendance already exists for this WhatsApp schedule on this date
@@ -1093,8 +1411,8 @@ const createActivityLog = async (req, res) => {
         try {
             // Get assistant's assigned centers
             const assistant = await User.findById(user_id).select('assignedCenters').lean();
-            const firstCenter = assistant?.assignedCenters && assistant.assignedCenters.length > 0 
-                ? assistant.assignedCenters[0] 
+            const firstCenter = assistant?.assignedCenters && assistant.assignedCenters.length > 0
+                ? assistant.assignedCenters[0]
                 : null;
 
             let sessionSubject = null;
@@ -1107,7 +1425,7 @@ const createActivityLog = async (req, res) => {
                 if (callSession) {
                     sessionSubject = callSession.name;
                     callSessionId = call_session_id;
-                    
+
                     // Calculate delay based on call session start time
                     const callDate = moment.tz(callSession.date, 'Africa/Cairo');
                     const [hours, minutes] = callSession.start_time.split(':');
@@ -1116,14 +1434,14 @@ const createActivityLog = async (req, res) => {
                     callDate.seconds(0);
                     callDate.milliseconds(0);
                     const sessionTime = callDate.toDate();
-                    
+
                     const calculatedDelay = getEgyptTimeDifferenceMinutes(newLog.start_time, sessionTime);
                     delayMinutes = calculatedDelay <= 0 ? 0 : Math.round(calculatedDelay);
                 }
             } else if (type === 'whatsapp') {
                 // For WhatsApp, create a descriptive subject
                 const startTimeStr = moment.tz(newLog.start_time, 'Africa/Cairo').format('HH:mm');
-                const endTimeStr = newLog.end_time 
+                const endTimeStr = newLog.end_time
                     ? moment.tz(newLog.end_time, 'Africa/Cairo').format('HH:mm')
                     : 'Ongoing';
                 sessionSubject = `WhatsApp Activity - ${startTimeStr} to ${endTimeStr}`;
@@ -1131,7 +1449,7 @@ const createActivityLog = async (req, res) => {
             } else if (type === 'call') {
                 // For manual call records without call_session_id
                 const startTimeStr = moment.tz(newLog.start_time, 'Africa/Cairo').format('HH:mm');
-                const endTimeStr = newLog.end_time 
+                const endTimeStr = newLog.end_time
                     ? moment.tz(newLog.end_time, 'Africa/Cairo').format('HH:mm')
                     : 'Ongoing';
                 sessionSubject = `Call Activity - ${startTimeStr} to ${endTimeStr}`;
@@ -1141,7 +1459,7 @@ const createActivityLog = async (req, res) => {
             // Check if attendance already exists
             const existingAttendance = await Attendance.findOne({
                 assistant_id: user_id,
-                ...(callSessionId ? { call_session_id: callSessionId } : { 
+                ...(callSessionId ? { call_session_id: callSessionId } : {
                     session_id: null,
                     call_session_id: null,
                     session_subject: sessionSubject,
@@ -1226,7 +1544,7 @@ const updateActivityLog = async (req, res) => {
             if (existingLog) {
                 const startTime = updateData.start_time || existingLog.start_time;
                 const endTime = updateData.end_time || existingLog.end_time;
-                
+
                 if (startTime && endTime) {
                     const diffMs = endTime - startTime;
                     updateData.duration_minutes = Math.round(diffMs / (1000 * 60));
@@ -1318,7 +1636,7 @@ const deleteActivityLog = async (req, res) => {
             // Find attendance records for this user on the same date with WhatsApp subject
             const logDate = moment.tz(log.start_time, 'Africa/Cairo').startOf('day');
             const nextDay = logDate.clone().add(1, 'day');
-            
+
             await Attendance.updateMany(
                 {
                     assistant_id: log.user_id,
@@ -1374,6 +1692,11 @@ module.exports = {
     deleteCallSession,
     startCallSession,
     stopCallSession,
+    // Call Session Students
+    importCallSessionStudents,
+    getCallSessionStudents,
+    updateCallSessionStudent,
+    assignNextStudent,
     // Activity Log
     createActivityLog,
     getActivityLogs,

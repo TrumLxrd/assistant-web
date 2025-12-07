@@ -31,7 +31,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         if (tabContent) tabContent.style.display = 'block';
 
         if (tab === 'whatsapp') loadWhatsAppSchedules();
-        else if (tab === 'calls') loadCallSessions();
     });
 });
 
@@ -137,109 +136,7 @@ function editWhatsApp(id) {
     openWhatsAppModal(id);
 }
 
-// Call Sessions
-async function loadCallSessions() {
-    const tbody = document.getElementById('calls-table');
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
 
-    try {
-        const response = await window.api.makeRequest('GET', '/activities/call-sessions');
-        if (response && response.success) {
-            displayCallSessions(response.data || []);
-        } else {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center">Failed to load</td></tr>';
-        }
-    } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center">Error loading</td></tr>';
-    }
-}
-
-function displayCallSessions(sessions) {
-    const tbody = document.getElementById('calls-table');
-
-    if (!sessions || sessions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center">No sessions found</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = sessions.map(s => {
-        const status = s.status === 'pending' ? 'Pending' : s.status === 'active' ? 'Active' : 'Completed';
-        const statusClass = s.status === 'active' ? 'success' : s.status === 'pending' ? 'secondary' : 'primary';
-        
-        // Display assistants
-        let assistantDisplay = 'Not started';
-        if (s.assistants && s.assistants.length > 0) {
-            const names = s.assistants.map(a => a.name || 'Unknown').filter(Boolean);
-            assistantDisplay = names.length > 0 ? names.join(', ') : 'Not started';
-        } else if (s.assistant_name) {
-            assistantDisplay = s.assistant_name;
-        }
-        
-        const endTimeDisplay = s.end_time ? new Date(s.end_time).toLocaleString() : '-';
-
-        return `
-            <tr>
-                <td><strong>${s.name || 'N/A'}</strong></td>
-                <td>${new Date(s.date).toLocaleDateString()}</td>
-                <td>${s.start_time}</td>
-                <td>${endTimeDisplay}</td>
-                <td><span class="badge badge-${statusClass}">${status}</span></td>
-                <td>${assistantDisplay}</td>
-                <td>
-                    <button class="btn btn-sm btn-outline" onclick="editCall('${s.id}')">Edit</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteCall('${s.id}', '${s.name}')">Delete</button>
-                </td>
-            </tr>
-        `;
-    }).join('');
-}
-
-function openCallModal(sessionId = null) {
-    const modal = document.getElementById('call-modal');
-
-    if (sessionId) {
-        document.getElementById('call-modal-title').textContent = 'Edit Call Session';
-        loadCallData(sessionId);
-    } else {
-        document.getElementById('call-modal-title').textContent = 'Add Call Session';
-        document.getElementById('call-form').reset();
-        document.getElementById('call-id').value = '';
-    }
-
-    modal.style.display = 'flex';
-}
-
-function closeCallModal() {
-    document.getElementById('call-modal').style.display = 'none';
-}
-
-async function loadCallData(id) {
-    try {
-        const response = await window.api.makeRequest('GET', `/activities/call-sessions/${id}`);
-        if (response.success) {
-            const session = response.data;
-            document.getElementById('call-id').value = session.id;
-            document.getElementById('call-name').value = session.name || '';
-            document.getElementById('call-date').value = session.date;
-            document.getElementById('call-start-time').value = session.start_time;
-            
-            // Set end_time if it exists
-            if (session.end_time) {
-                const endTimeDate = new Date(session.end_time);
-                const endTimeString = endTimeDate.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:mm
-                document.getElementById('call-end-time').value = endTimeString;
-            } else {
-                document.getElementById('call-end-time').value = '';
-            }
-        }
-    } catch (error) {
-        showAlert('Failed to load session', 'error');
-    }
-}
-
-function editCall(id) {
-    openCallModal(id);
-}
 
 // Delete Modal Logic
 function openDeleteModal(id, type, name) {
@@ -253,9 +150,6 @@ function openDeleteModal(id, type, name) {
     if (type === 'whatsapp') {
         title.textContent = 'Delete Schedule';
         message.innerHTML = `Are you sure you want to delete schedule for <strong>${name}</strong>?`;
-    } else {
-        title.textContent = 'Delete Session';
-        message.innerHTML = `Are you sure you want to delete session <strong>${name}</strong>?`;
     }
 
     modal.style.display = 'flex';
@@ -271,9 +165,7 @@ function deleteWhatsApp(id, name) {
     openDeleteModal(id, 'whatsapp', name);
 }
 
-function deleteCall(id, name) {
-    openDeleteModal(id, 'call', name);
-}
+
 
 async function confirmDelete() {
     if (!currentDeleteItem || !currentDeleteType) return;
@@ -287,8 +179,6 @@ async function confirmDelete() {
         let endpoint = '';
         if (currentDeleteType === 'whatsapp') {
             endpoint = `/activities/whatsapp-schedules/${currentDeleteItem}`;
-        } else {
-            endpoint = `/activities/call-sessions/${currentDeleteItem}`;
         }
 
         const response = await window.api.makeRequest('DELETE', endpoint);
@@ -297,7 +187,6 @@ async function confirmDelete() {
             showAlert('Item deleted successfully');
             closeDeleteModal();
             if (currentDeleteType === 'whatsapp') loadWhatsAppSchedules();
-            else loadCallSessions();
         } else {
             showAlert(response.message || 'Failed to delete', 'error');
         }
@@ -340,52 +229,16 @@ document.getElementById('whatsapp-form').addEventListener('submit', async (e) =>
     }
 });
 
-document.getElementById('call-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
 
-    const id = document.getElementById('call-id').value;
-    const endTimeValue = document.getElementById('call-end-time').value;
-    
-    const data = {
-        name: document.getElementById('call-name').value,
-        date: document.getElementById('call-date').value,
-        start_time: document.getElementById('call-start-time').value
-    };
-    
-    // Add end_time if provided
-    if (endTimeValue) {
-        // Convert local datetime to ISO string for backend
-        const endTimeDate = new Date(endTimeValue);
-        data.end_time = endTimeDate.toISOString();
-    }
-
-    try {
-        const method = id ? 'PUT' : 'POST';
-        const endpoint = id ? `/activities/call-sessions/${id}` : '/activities/call-sessions';
-        const response = await window.api.makeRequest(method, endpoint, data);
-
-        if (response.success) {
-            showAlert(id ? 'Session updated' : 'Session created');
-            closeCallModal();
-            loadCallSessions();
-        } else {
-            showAlert(response.message || 'Failed to save session', 'error');
-        }
-    } catch (error) {
-        console.error(error);
-        showAlert(error.message || 'Failed to save session', 'error');
-    }
-});
 
 // Event listeners
 document.getElementById('add-whatsapp-btn').addEventListener('click', () => openWhatsAppModal());
-document.getElementById('add-call-btn').addEventListener('click', () => openCallModal());
+
 
 document.getElementById('close-whatsapp-modal').addEventListener('click', closeWhatsAppModal);
 document.getElementById('cancel-whatsapp-btn').addEventListener('click', closeWhatsAppModal);
 
-document.getElementById('close-call-modal').addEventListener('click', closeCallModal);
-document.getElementById('cancel-call-btn').addEventListener('click', closeCallModal);
+
 
 document.getElementById('close-delete-modal').addEventListener('click', closeDeleteModal);
 document.getElementById('cancel-delete-btn').addEventListener('click', closeDeleteModal);
@@ -396,9 +249,7 @@ document.getElementById('whatsapp-modal').addEventListener('click', (e) => {
     if (e.target.id === 'whatsapp-modal') closeWhatsAppModal();
 });
 
-document.getElementById('call-modal').addEventListener('click', (e) => {
-    if (e.target.id === 'call-modal') closeCallModal();
-});
+
 
 document.getElementById('delete-modal').addEventListener('click', (e) => {
     if (e.target.id === 'delete-modal') closeDeleteModal();

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#6366f1">
+    <title>Call Session - Attendance System</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="../shared/css/common.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/call-session.css">
+</head>
+
+<body>
+    <header class="header">
+        <div class="header-content">
+            <h1>📞 Call Session</h1>
+            <div class="user-info">
+                <span id="session-name">Loading...</span>
+                <a href="sessions.html" class="btn logout-btn">← Back</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div class="call-session-container">
+            <!-- Student Card -->
+            <div class="student-card">
+                <!-- Top Counters -->
+                <div class="top-counters">
+                    <div class="counter-box">
+                        <span class="counter-value" id="remaining-count">0</span>
+                        <span class="counter-label">Remaining</span>
+                    </div>
+                    <div class="student-counter">
+                        <span id="current-student">1</span> / <span id="total-students">0</span>
+                    </div>
+                    <div class="counter-box">
+                        <span class="counter-value" id="completed-count">0</span>
+                        <span class="counter-label">Completed</span>
+                    </div>
+                </div>
+
+                <div class="student-body">
+                    <!-- Name Section -->
+                    <div class="form-group">
+                        <input type="text" id="student-name" class="form-input student-name-input"
+                            placeholder="Student name" readonly>
+                    </div>
+
+                    <!-- Student Phone Section -->
+                    <div class="form-group">
+                        <label for="student-phone">Student Phone</label>
+                        <div class="phone-row">
+                            <input type="tel" id="student-phone" class="form-input" placeholder="+20 123 456 7890"
+                                readonly>
+                            <div class="phone-actions">
+                                <button class="btn-action btn-call" id="call-student">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2">
+                                        <path
+                                            d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z">
+                                        </path>
+                                    </svg>
+                                    Call
+                                </button>
+                                <button class="btn-action btn-copy" id="copy-student">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                    </svg>
+                                    Copy
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Parent Phone Section -->
+                    <div class="form-group">
+                        <label for="parent-phone">Parent Phone</label>
+                        <div class="phone-row">
+                            <input type="tel" id="parent-phone" class="form-input" placeholder="+20 123 456 7890"
+                                readonly>
+                            <div class="phone-actions">
+                                <button class="btn-action btn-call" id="call-parent">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2">
+                                        <path
+                                            d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z">
+                                        </path>
+                                    </svg>
+                                    Call
+                                </button>
+                                <button class="btn-action btn-copy" id="copy-parent">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                    </svg>
+                                    Copy
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filters & Comment Section -->
+                    <div class="filters-section">
+                        <div class="filter-buttons">
+                            <button class="filter-btn" data-filter="wrong-number">رقم غلط</button>
+                            <button class="filter-btn" data-filter="no-answer">مفيش رد</button>
+                            <button class="filter-btn" data-filter="online-makeup">هيعوض اون لاين</button>
+                            <button class="filter-btn" data-filter="left-teacher">ساب المستر</button>
+                            <button class="filter-btn" data-filter="other-makeup">هيعوض في معاد اخر</button>
+                        </div>
+                        <button class="btn btn-secondary btn-block btn-comment" id="add-comment-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                            Add Comment
+                        </button>
+                        <div class="comments-list" id="comments-list">
+                            <!-- Comments will be displayed here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigation -->
+                <div class="student-navigation">
+                    <button class="btn btn-secondary" id="prev-student">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                        Previous
+                    </button>
+                    <button class="btn btn-primary" id="next-student">
+                        Next
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Comment Modal -->
+    <div class="modal" id="comment-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Comment</h3>
+                <button class="modal-close" id="close-comment-modal">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <textarea id="comment-text" class="form-textarea" placeholder="Enter your comment here..."
+                    rows="5"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancel-comment">Cancel</button>
+                <button class="btn btn-primary" id="save-comment">Save Comment</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="../shared/js/api.js"></script>
+    <script src="js/call-session.js"></script>
+</body>
+
+</html>

@@ -22,10 +22,10 @@ if (user) {
 // Display current date in Egypt timezone
 function getEgyptDate() {
   const now = new Date();
-  const options = { 
-    weekday: 'long', 
-    year: 'numeric', 
-    month: 'long', 
+  const options = {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
     day: 'numeric',
     timeZone: 'Africa/Cairo'
   };
@@ -149,11 +149,11 @@ function renderCallSessionCard(session) {
   const isJoined = assistants.some(a => String(a.id) === String(user.id));
   const isFirstAssistant = session.assistant_id && String(session.assistant_id) === String(user.id);
   const isInSession = isJoined || isFirstAssistant;
-  
+
   // Check if end_time is set (admin scheduled end time)
   const hasScheduledEndTime = session.end_time && new Date(session.end_time) > new Date();
   const endTimeDisplay = session.end_time ? new Date(session.end_time).toLocaleString() : null;
-  
+
   let buttonHtml;
   if (session.status === 'pending') {
     buttonHtml = `<button class="btn btn-primary" onclick="startCallSession('${session.id}')">Join Call</button>`;
@@ -202,9 +202,9 @@ function renderCallSessionCard(session) {
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
             <circle cx="12" cy="7" r="4"></circle>
           </svg>
-          ${session.assistants && session.assistants.length > 0 
-            ? session.assistants.map(a => a.name || 'Unknown').join(', ')
-            : session.assistant_name || 'Not started'}
+          ${session.assistants && session.assistants.length > 0
+        ? session.assistants.map(a => a.name || 'Unknown').join(', ')
+        : session.assistant_name || 'Not started'}
         </div>
         ` : ''}
         
@@ -231,11 +231,25 @@ window.startCallSession = async function (sessionId) {
 
     if (response.success) {
       showAlert('Call session started successfully', 'success');
-      loadCallSessions();
+      setTimeout(() => {
+        window.location.href = `call-session.html?session=${sessionId}`;
+      }, 1000);
     } else {
-      showAlert(response.message || 'Failed to start call session', 'error');
+      // Check if user is already joined
+      if (response.message && (response.message.includes('already joined') || response.message.includes('already in'))) {
+        // Redirect anyway
+        window.location.href = `call-session.html?session=${sessionId}`;
+      } else {
+        showAlert(response.message || 'Failed to start call session', 'error');
+      }
     }
   } catch (error) {
+    // Handle error response object if available
+    if (error.response && error.response.data &&
+      (error.response.data.message.includes('already joined') || error.response.data.message.includes('already in'))) {
+      window.location.href = `call-session.html?session=${sessionId}`;
+      return;
+    }
     showAlert(error.message || 'Failed to start call session', 'error');
   }
 };
@@ -263,7 +277,7 @@ window.stopCallSession = async function (sessionId) {
 // Load call sessions
 async function loadCallSessions() {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
     const response = await window.api.makeRequest('GET', `/activities/call-sessions?date=${today}&status=pending,active`);
 
     if (response.success && response.data.length > 0) {

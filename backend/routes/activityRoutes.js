@@ -14,6 +14,11 @@ const {
     deleteCallSession,
     startCallSession,
     stopCallSession,
+    // Call Session Students
+    importCallSessionStudents,
+    getCallSessionStudents,
+    updateCallSessionStudent,
+    assignNextStudent,
     // Activity Log
     createActivityLog,
     getActivityLogs,
@@ -41,6 +46,12 @@ router.put('/call-sessions/:id', checkRole('admin'), updateCallSession);
 router.delete('/call-sessions/:id', checkRole('admin'), deleteCallSession);
 router.post('/call-sessions/:id/start', checkRole('assistant'), startCallSession);
 router.post('/call-sessions/:id/stop', stopCallSession); // Both admin and assistant can stop
+
+// Call Session Student routes
+router.post('/call-sessions/:id/students', checkRole('admin'), importCallSessionStudents);
+router.post('/call-sessions/:id/assign', assignNextStudent); // Assign/Get Next
+router.get('/call-sessions/:id/students', getCallSessionStudents); // Both admin and assistant can view
+router.put('/call-sessions/students/:studentId', updateCallSessionStudent); // Assistant updates status/comment
 
 // Activity Log routes (Admin only)
 router.post('/logs', checkRole('admin'), createActivityLog);
