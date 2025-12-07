@@ -28,6 +28,11 @@ const activityLogSchema = new mongoose.Schema({
         default: 0,
         min: [0, 'Duration cannot be negative']
     },
+    completed_count: {
+        type: Number,
+        default: 0,
+        min: [0, 'Completed count cannot be negative']
+    },
     call_session_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'CallSession',

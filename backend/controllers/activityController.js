@@ -759,41 +759,56 @@ const stopCallSession = async (req, res) => {
 
         const now = getCurrentEgyptTime();
 
-        // Use scheduled end_time if set, otherwise use current time
-        const endTime = session.end_time || now;
-
-        // Update session
-        session.status = 'completed';
-        session.end_time = endTime;
-        await session.save();
-
-        // Update all activity logs for this session with end_time and calculate duration
-        const activityLogs = await ActivityLog.find({
+        // Find activity log for THIS user and THIS session that is open
+        const activityLog = await ActivityLog.findOne({
             call_session_id: id,
+            user_id: userId,
             end_time: null
         });
 
-        for (const log of activityLogs) {
-            log.end_time = endTime;
+        let durationMinutes = 0;
+
+        if (activityLog) {
+            activityLog.end_time = now;
             // Calculate duration
-            if (log.start_time) {
-                const durationMs = endTime.getTime() - log.start_time.getTime();
-                log.duration_minutes = Math.round(durationMs / (1000 * 60));
+            if (activityLog.start_time) {
+                const durationMs = now.getTime() - activityLog.start_time.getTime();
+                durationMinutes = Math.round(durationMs / (1000 * 60));
+                activityLog.duration_minutes = durationMinutes;
             }
-            await log.save();
+
+            // Calculate completed students count for this assistant in this session
+            const completedCount = await CallSessionStudent.countDocuments({
+                call_session_id: id,
+                assigned_to: userId,
+                filter_status: { $ne: '' } // Only count students with a status (completed)
+            });
+            activityLog.completed_count = completedCount;
+
+            await activityLog.save();
+        } else {
+            // If no log found, maybe just return success? Or handled?
+            // It's possible they didn't start one or it was already closed.
+        }
+
+        // Remove assistant from the active assistants list
+        // filtering out the current user ID
+        if (session.assistants && session.assistants.length > 0) {
+            session.assistants = session.assistants.filter(aid => aid.toString() !== userId.toString());
+            await session.save();
         }
 
         await logAuditAction(userId, 'STOP_CALL_SESSION', {
             session_id: id,
-            // activity_log_id: null // Removed singular reference
+            activity_log_id: activityLog?._id || null
         });
 
         res.json({
             success: true,
-            message: 'Call session stopped successfully',
+            message: 'Your session ended successfully',
             data: {
                 session_id: session._id,
-                duration_minutes: 0 // Cannot determine single duration for session easily here
+                duration_minutes: durationMinutes
             }
         });
     } catch (error) {

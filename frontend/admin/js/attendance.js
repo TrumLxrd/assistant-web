@@ -98,13 +98,13 @@ function displayAttendance(records) {
         const attendanceTime = new Date(record.time_recorded).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
         const delayMinutes = record.delay_minutes || 0;
-        
+
         // Delay badge: Always show actual delay time
         const delayBadge = delayMinutes > 0
             ? `<span class="badge badge-warning">+${delayMinutes} min</span>`
             : delayMinutes < 0
-            ? `<span class="badge badge-info">${delayMinutes} min</span>`
-            : '<span class="badge badge-success">0 min</span>';
+                ? `<span class="badge badge-info">${delayMinutes} min</span>`
+                : '<span class="badge badge-success">0 min</span>';
 
         // Status badge: "On Time" if delay <= 10 minutes, otherwise "Late"
         const statusBadge = delayMinutes <= 10
@@ -338,26 +338,38 @@ async function loadManualAttendanceData() {
 // Open manual attendance modal
 function openManualAttendanceModal() {
     const modal = document.getElementById('manual-attendance-modal');
-    const assistantSelect = document.getElementById('manual-assistant');
-    const sessionSelect = document.getElementById('manual-session');
 
-    // Populate assistants
-    assistantSelect.innerHTML = '<option value="">Select Assistant</option>';
+    // Clear previous inputs
+    document.getElementById('manual-assistant-input').value = '';
+    document.getElementById('manual-assistant').value = '';
+    document.getElementById('manual-session-input').value = '';
+    document.getElementById('manual-session').value = '';
+
+    // Populate assistants datalist
+    const assistantList = document.getElementById('manual-assistant-list');
+    assistantList.innerHTML = '';
     allAssistants.forEach(assistant => {
         const option = document.createElement('option');
-        option.value = assistant.id;
-        option.textContent = assistant.name;
-        assistantSelect.appendChild(option);
+        option.value = assistant.name; // User types name
+        option.dataset.id = assistant.id; // Store ID for lookup
+        assistantList.appendChild(option);
     });
 
-    // Populate sessions (recent ones)
-    sessionSelect.innerHTML = '<option value="">Select Session</option>';
-    allSessions.slice(0, 50).forEach(session => { // Limit to recent 50 sessions
+    // Populate sessions datalist
+    const sessionList = document.getElementById('manual-session-list');
+    sessionList.innerHTML = '';
+    allSessions.slice(0, 50).forEach(session => {
         const option = document.createElement('option');
-        option.value = session.id;
-        option.textContent = `${session.subject} - ${session.center_name} (${new Date(session.start_time).toLocaleDateString()})`;
-        sessionSelect.appendChild(option);
+        // Format: Subject - Center (Date)
+        const sessionName = `${session.subject} - ${session.center_name} (${new Date(session.start_time).toLocaleDateString()})`;
+        option.value = sessionName;
+        option.dataset.id = session.id;
+        sessionList.appendChild(option);
     });
+
+    // Setup input listeners to update hidden IDs
+    setupSearchableInput('manual-assistant-input', 'manual-assistant-list', 'manual-assistant', allAssistants, 'name');
+    setupSearchableInput('manual-session-input', 'manual-session-list', 'manual-session', allSessions, null, (s) => `${s.subject} - ${s.center_name} (${new Date(s.start_time).toLocaleDateString()})`);
 
     // Set current datetime as default
     const now = new Date();
@@ -369,6 +381,42 @@ function openManualAttendanceModal() {
     setTimeout(() => {
         modal.classList.add('active');
     }, 10);
+}
+
+// Helper to setup searchable input logic
+function setupSearchableInput(inputId, listId, hiddenId, sourceData, nameField, nameFormatter) {
+    const input = document.getElementById(inputId);
+    const hidden = document.getElementById(hiddenId);
+
+    // Update hidden ID on input change
+    input.oninput = function () {
+        const val = this.value;
+        const opts = document.getElementById(listId).options;
+        let foundId = '';
+
+        for (let i = 0; i < opts.length; i++) {
+            if (opts[i].value === val) {
+                // We stored ID in dataset, but datalist options via JS don't officially support getting dataset back easily from input value matching
+                // Instead, we can look up in sourceData
+                break;
+            }
+        }
+
+        // Lookup in source data
+        const match = sourceData.find(item => {
+            const itemName = nameFormatter ? nameFormatter(item) : item[nameField];
+            return itemName === val;
+        });
+
+        if (match) {
+            hidden.value = match.id;
+        } else {
+            hidden.value = ''; // Invalid selection
+        }
+    };
+
+    // Also try to find on blur in case they typed exact name but didn't click
+    input.onblur = input.oninput;
 }
 
 // Close manual attendance modal
@@ -585,22 +633,28 @@ async function openEditAttendanceModal(attendanceId) {
     }
 
     // Populate assistants
-    assistantSelect.innerHTML = '<option value="">Select Assistant</option>';
+    // Populate assistants datalist
+    const assistantList = document.getElementById('edit-assistant-list');
+    assistantList.innerHTML = '';
     allAssistants.forEach(assistant => {
         const option = document.createElement('option');
-        option.value = assistant.id;
-        option.textContent = assistant.name;
-        assistantSelect.appendChild(option);
+        option.value = assistant.name;
+        assistantList.appendChild(option);
     });
 
-    // Populate sessions
-    sessionSelect.innerHTML = '<option value="">Select Session</option>';
+    // Populate sessions datalist
+    const sessionList = document.getElementById('edit-session-list');
+    sessionList.innerHTML = '';
     allSessions.forEach(session => {
         const option = document.createElement('option');
-        option.value = session.id;
-        option.textContent = `${session.subject} - ${session.center_name} (${new Date(session.start_time).toLocaleDateString()})`;
-        sessionSelect.appendChild(option);
+        const sessionName = `${session.subject} - ${session.center_name} (${new Date(session.start_time).toLocaleDateString()})`;
+        option.value = sessionName;
+        sessionList.appendChild(option);
     });
+
+    // Setup input listeners
+    setupSearchableInput('edit-assistant-input', 'edit-assistant-list', 'edit-assistant', allAssistants, 'name');
+    setupSearchableInput('edit-session-input', 'edit-session-list', 'edit-session', allSessions, null, (s) => `${s.subject} - ${s.center_name} (${new Date(s.start_time).toLocaleDateString()})`);
 
     // Populate centers
     centerSelect.innerHTML = '<option value="">Select Center</option>';
@@ -648,32 +702,29 @@ async function loadAttendanceDataForEdit(attendanceId) {
             const centerSelect = document.getElementById('edit-center');
 
             // Set values - convert option values to strings for comparison
-            if (assistantId && assistantSelect) {
-                // Find matching option by comparing string values
-                const assistantOption = Array.from(assistantSelect.options).find(
-                    opt => String(opt.value) === assistantId
-                );
-                if (assistantOption) {
-                    assistantSelect.value = assistantId;
-                } else {
-                    console.warn('Assistant ID not found in dropdown:', assistantId);
+            // Set values for searchable inputs
+            if (assistantId) {
+                const assistant = allAssistants.find(a => String(a.id) === assistantId);
+                if (assistant) {
+                    document.getElementById('edit-assistant-input').value = assistant.name;
+                    document.getElementById('edit-assistant').value = assistantId;
                 }
             }
 
-            if (sessionId && sessionSelect) {
-                const sessionOption = Array.from(sessionSelect.options).find(
-                    opt => String(opt.value) === sessionId
-                );
-                if (sessionOption) {
-                    sessionSelect.value = sessionId;
+            if (sessionId) {
+                const session = allSessions.find(s => String(s.id) === sessionId);
+                if (session) {
+                    const sessionName = `${session.subject} - ${session.center_name} (${new Date(session.start_time).toLocaleDateString()})`;
+                    document.getElementById('edit-session-input').value = sessionName;
+                    document.getElementById('edit-session').value = sessionId;
                 } else {
-                    console.warn('Session ID not found in dropdown:', sessionId);
-                    // If session is deleted, show a message
-                    if (!sessionOption) {
-                        showAlert('Warning: Session may have been deleted. Please select a valid session.', 'warning');
-                    }
+                    console.warn('Session ID not found in loaded sessions:', sessionId);
+                    // Set hidden ID anyway, but input empty? or maybe try to fetch it?
+                    // For now just warn.
                 }
             }
+
+            // Removed old select logic for session
 
             if (centerId && centerSelect) {
                 const centerOption = Array.from(centerSelect.options).find(
@@ -757,17 +808,17 @@ function openDeleteAttendanceModal(attendanceId) {
     const modal = document.getElementById('delete-attendance-modal');
     const reasonInput = document.getElementById('delete-reason');
     const charCount = document.getElementById('reason-char-count');
-    
+
     // Reset form
     reasonInput.value = '';
     charCount.textContent = '0';
-    
+
     // Show modal
     modal.style.display = 'flex';
     setTimeout(() => {
         modal.classList.add('active');
     }, 10);
-    
+
     // Focus on reason input
     setTimeout(() => {
         reasonInput.focus();
@@ -777,7 +828,7 @@ function openDeleteAttendanceModal(attendanceId) {
 function closeDeleteAttendanceModal() {
     const modal = document.getElementById('delete-attendance-modal');
     const form = document.getElementById('delete-attendance-form');
-    
+
     modal.classList.remove('active');
     setTimeout(() => {
         modal.style.display = 'none';
@@ -790,7 +841,7 @@ function closeDeleteAttendanceModal() {
 document.getElementById('delete-reason').addEventListener('input', (e) => {
     const charCount = document.getElementById('reason-char-count');
     charCount.textContent = e.target.value.length;
-    
+
     if (e.target.value.length > 200) {
         charCount.style.color = 'var(--accent-red)';
     } else {
@@ -801,36 +852,36 @@ document.getElementById('delete-reason').addEventListener('input', (e) => {
 // Delete attendance form submit
 document.getElementById('delete-attendance-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    
+
     if (!currentDeletingAttendanceId) {
         showAlert('Error: No attendance record selected', 'error');
         return;
     }
-    
+
     const reasonInput = document.getElementById('delete-reason');
     const reason = reasonInput.value.trim();
-    
+
     if (!reason || reason.length === 0) {
         showAlert('Please provide a reason for deletion', 'error');
         reasonInput.focus();
         return;
     }
-    
+
     if (reason.length > 200) {
         showAlert('Deletion reason cannot exceed 200 characters', 'error');
         reasonInput.focus();
         return;
     }
-    
+
     const confirmBtn = document.getElementById('confirm-delete-btn');
     confirmBtn.disabled = true;
     confirmBtn.textContent = 'Deleting...';
-    
+
     try {
         const response = await window.api.makeRequest('DELETE', `/admin/attendance/${currentDeletingAttendanceId}`, {
             reason: reason
         });
-        
+
         if (response.success) {
             showAlert('Attendance record deleted successfully', 'success');
             closeDeleteAttendanceModal();

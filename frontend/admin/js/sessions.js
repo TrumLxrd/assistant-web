@@ -9,6 +9,7 @@ if (!window.api.isAuthenticated() || !user || user.role !== 'admin') {
 let currentSessionToDelete = null;
 let centers = [];
 let assistants = [];
+let allSessions = [];
 
 // Alert function
 function showAlert(message, type = 'success') {
@@ -60,7 +61,8 @@ async function loadSessions() {
         const response = await window.api.makeRequest('GET', '/admin/sessions');
 
         if (response.success) {
-            displaySessions(response.data);
+            allSessions = response.data;
+            applyFilters();
         }
     } catch (error) {
         console.error('Error loading sessions:', error);
@@ -262,16 +264,52 @@ async function deleteSession() {
 }
 
 // Search functionality
-document.getElementById('search-input').addEventListener('input', (e) => {
-    const searchTerm = e.target.value.toLowerCase();
-    const rows = document.querySelectorAll('#sessions-table tr');
+document.getElementById('search-input').addEventListener('input', applyFilters);
 
-    rows.forEach(row => {
-        const subject = row.querySelector('strong')?.textContent.toLowerCase() || '';
-        const center = row.querySelectorAll('td')[3]?.textContent.toLowerCase() || '';
-        row.style.display = (subject.includes(searchTerm) || center.includes(searchTerm)) ? '' : 'none';
-    });
-});
+// Filter functionality
+document.getElementById('filter-recurrence').addEventListener('change', applyFilters);
+document.getElementById('filter-day').addEventListener('change', applyFilters);
+
+function applyFilters() {
+    let filtered = [...allSessions];
+
+    // Recurrence filter
+    const recurrenceFilter = document.getElementById('filter-recurrence').value;
+    if (recurrenceFilter !== 'all') {
+        filtered = filtered.filter(s => (s.recurrence_type || 'one_time') === recurrenceFilter);
+    }
+
+    // Day filter
+    const dayFilter = document.getElementById('filter-day').value;
+    if (dayFilter !== 'all') {
+        const day = parseInt(dayFilter);
+        filtered = filtered.filter(s => {
+            if (s.day_of_week) {
+                return s.day_of_week === day;
+            } else if (s.start_time) {
+                // For one-time sessions without explicit day_of_week, calculate from date
+                const date = new Date(s.start_time);
+                const jsDay = date.getDay(); // 0=Sun, 1=Mon...
+                const customDay = jsDay === 0 ? 7 : jsDay;
+                return customDay === day;
+            }
+            return false;
+        });
+    }
+
+    // Search filter
+    const searchTerm = document.getElementById('search-input').value.toLowerCase();
+    if (searchTerm) {
+        filtered = filtered.filter(s => {
+            const subject = (s.subject || '').toLowerCase();
+            const center = (s.center_name || '').toLowerCase();
+            const assistant = (s.assistant_name || '').toLowerCase();
+            return subject.includes(searchTerm) || center.includes(searchTerm) || assistant.includes(searchTerm);
+        });
+    }
+
+    displaySessions(filtered);
+}
 
 // Event listeners
 document.getElementById('add-session-btn').addEventListener('click', () => openSessionModal());

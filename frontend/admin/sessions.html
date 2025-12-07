@@ -40,10 +40,38 @@
 
         <!-- Sessions Table -->
         <div class="card">
-            <div class="section-header" style="margin-bottom: 1.5rem;">
+            <div class="section-header" style="margin-bottom: 1rem;">
                 <h2>All Sessions</h2>
                 <input type="text" id="search-input" class="form-input" placeholder="Search sessions..."
                     style="max-width: 300px;">
+            </div>
+
+            <div class="filters-bar"
+                style="display: flex; gap: 1rem; margin-bottom: 1.5rem; background: white; padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                <div class="filter-group" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <label style="font-weight: 500; font-size: 0.9rem; white-space: nowrap;">Type:</label>
+                    <select id="filter-recurrence" class="form-select"
+                        style="width: 150px; padding: 0.4rem 2rem 0.4rem 0.8rem;">
+                        <option value="all">All Types</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="one_time">One Time</option>
+                    </select>
+                </div>
+
+                <div class="filter-group" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <label style="font-weight: 500; font-size: 0.9rem; white-space: nowrap;">Day:</label>
+                    <select id="filter-day" class="form-select"
+                        style="width: 150px; padding: 0.4rem 2rem 0.4rem 0.8rem;">
+                        <option value="all">All Days</option>
+                        <option value="1">Monday</option>
+                        <option value="2">Tuesday</option>
+                        <option value="3">Wednesday</option>
+                        <option value="4">Thursday</option>
+                        <option value="5">Friday</option>
+                        <option value="6">Saturday</option>
+                        <option value="7">Sunday</option>
+                    </select>
+                </div>
             </div>
 
             <div class="table-container">

@@ -87,8 +87,10 @@
                 style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                 <h2 style="margin: 0;">Activity Records</h2>
                 <div style="display: flex; align-items: center; gap: 1rem;">
-                    <button class="btn btn-primary" id="add-record-btn" style="display: flex; align-items: center; gap: 0.5rem;">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <button class="btn btn-primary" id="add-record-btn"
+                        style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
                             <line x1="12" y1="5" x2="12" y2="19"></line>
                             <line x1="5" y1="12" x2="19" y2="12"></line>
                         </svg>
@@ -107,12 +109,13 @@
                             <th>Start Time</th>
                             <th>End Time</th>
                             <th>Duration</th>
+                            <th>Completed</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="records-table">
                         <tr>
-                            <td colspan="6" class="text-center">
+                            <td colspan="7" class="text-center">
                                 <div class="loading-spinner"></div>
                                 Loading records...
                             </td>

@@ -105,7 +105,7 @@ function displayRecords(records) {
     if (!records || records.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="text-center">No activity records found.</td>
+                <td colspan="7" class="text-center">No activity records found.</td>
             </tr>
         `;
         return;
@@ -126,6 +126,11 @@ function displayRecords(records) {
             ? '<span class="badge badge-primary">WhatsApp</span>'
             : '<span class="badge badge-success">Call</span>';
 
+        // Completed count display
+        const completedStr = (record.type === 'call' && record.completed_count !== undefined)
+            ? `<span style="font-weight: 500;">${record.completed_count}</span>`
+            : '<span style="color: #9ca3af;">-</span>';
+
         return `
             <tr data-id="${record.id}">
                 <td>${record.user_name || 'Unknown'}</td>
@@ -133,6 +138,7 @@ function displayRecords(records) {
                 <td>${startTimeStr}</td>
                 <td>${endTimeStr}</td>
                 <td>${durationStr}</td>
+                <td>${completedStr}</td>
                 <td>
                     <div class="table-actions" style="display: flex; gap: 0.5rem;">
                         <button class="btn-icon edit-record-btn" data-id="${record.id}" title="Edit">
@@ -411,7 +417,7 @@ const addModal = document.getElementById('add-modal');
 function openAddModal() {
     addModal.style.display = 'flex';
     document.getElementById('add-form').reset();
-    
+
     // Set current date/time as default
     const now = new Date();
     const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
