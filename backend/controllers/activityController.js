@@ -1163,7 +1163,7 @@ const generateWhatsAppRecordsForDate = async (targetDate) => {
             type: 'whatsapp',
             whatsapp_schedule_id: schedule._id,
             start_time: {
-                $gte: startDateTime.toDate(),
+                $gte: dateMoment.toDate(), // Search from start of day to avoid duplicates if time changes
                 $lt: dateMoment.clone().add(1, 'day').toDate()
             },
             is_deleted: false
@@ -1202,7 +1202,7 @@ const generateWhatsAppRecordsForDate = async (targetDate) => {
                         { session_id: { $exists: false }, call_session_id: { $exists: false } }
                     ],
                     time_recorded: {
-                        $gte: startDateTime.toDate(),
+                        $gte: dateMoment.toDate(), // Search from start of day
                         $lt: dateMoment.clone().add(1, 'day').toDate()
                     },
                     notes: { $regex: `WhatsApp schedule.*${schedule._id}`, $options: 'i' }
