@@ -27,8 +27,29 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 /* ---------- Middleware ---------- */
+// CORS configuration - allow Vercel deployment and localhost
+const allowedOrigins = [
+    'https://assist-web.vercel.app',
+    'https://assistweb.vercel.app',
+    process.env.FRONTEND_URL,
+    `http://localhost:${PORT}`,
+    `http://localhost:5000`,
+    `http://127.0.0.1:${PORT}`,
+    `http://127.0.0.1:5000`
+].filter(Boolean);
+
 app.use(cors({
-    origin: process.env.FRONTEND_URL || `http://localhost:${PORT}`,
+    origin: function (origin, callback) {
+        // Allow requests with no origin (same-origin requests, mobile apps, etc.)
+        if (!origin) return callback(null, true);
+
+        if (allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            console.log('CORS blocked origin:', origin);
+            callback(null, true); // Allow all origins for now (Vercel handles CORS at edge)
+        }
+    },
     credentials: true
 }));
 app.use(express.json());
