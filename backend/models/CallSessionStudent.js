@@ -19,6 +19,22 @@ const callSessionStudentSchema = new mongoose.Schema({
         type: String,
         default: ''
     },
+    student_id: {
+        type: String,
+        default: ''
+    },
+    center: {
+        type: String,
+        default: ''
+    },
+    exam_mark: {
+        type: mongoose.Schema.Types.Mixed, // Can be number or string
+        default: null
+    },
+    attendance_status: {
+        type: String,
+        default: ''
+    },
     filter_status: {
         type: String,
         enum: ['', 'wrong-number', 'no-answer', 'online-makeup', 'left-teacher', 'other-makeup'],

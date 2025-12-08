@@ -109,6 +109,14 @@ function displaySessions(sessions) {
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                             </svg>
                         </button>
+                        ${session.status !== 'completed' ? `
+                        <button class="btn-icon end-btn" data-id="${session.id}" title="End Session" style="color: var(--accent-orange);">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <rect x="9" y="9" width="6" height="6"></rect>
+                            </svg>
+                        </button>
+                        ` : ''}
                         <a href="../assistant/call-session.html?session=${session.id}" target="_blank" class="btn-icon" title="Join as Assistant" style="color: var(--accent-purple); display: flex; align-items: center; justify-content: center; text-decoration: none;">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
@@ -133,6 +141,10 @@ function displaySessions(sessions) {
         btn.addEventListener('click', () => editSession(btn.dataset.id));
     });
 
+    document.querySelectorAll('.end-btn').forEach(btn => {
+        btn.addEventListener('click', () => endSession(btn.dataset.id));
+    });
+
     document.querySelectorAll('.delete-btn').forEach(btn => {
         btn.addEventListener('click', () => openDeleteModal(btn.dataset.id));
     });
@@ -142,7 +154,9 @@ function displaySessions(sessions) {
     });
 
     document.querySelectorAll('.monitor-btn').forEach(btn => {
-        btn.addEventListener('click', () => openMonitorModal(btn.dataset.id));
+        btn.addEventListener('click', () => {
+            window.location.href = `monitor-session.html?session=${btn.dataset.id}`;
+        });
     });
 }
 
@@ -242,6 +256,22 @@ function parseImportFile(file) {
                         else if (['parentphone', 'fatherphone', 'motherphone', 'parentmobile'].includes(cleanKey)) {
                             newRow.parentPhone = String(val);
                         }
+                        // Exam Mark
+                        else if (['exammark', 'mark', 'score', 'degree', 'grade', 'exam'].includes(cleanKey)) {
+                            newRow.examMark = val;
+                        }
+                        // Center
+                        else if (['center', 'location', 'branch', 'group'].includes(cleanKey)) {
+                            newRow.center = val;
+                        }
+                        // Student ID
+                        else if (['studentid', 'id', 'code', 'studentcode'].includes(cleanKey)) {
+                            newRow.studentId = val;
+                        }
+                        // Attendance Status
+                        else if (['attendancestatus', 'attendance', 'status', 'present', 'absent'].includes(cleanKey)) {
+                            newRow.attendanceStatus = val;
+                        }
                     });
 
                     // Validation: Must have at least a name
@@ -254,8 +284,20 @@ function parseImportFile(file) {
                     }
 
                     // Cleaning up phones (remove dashes, spaces if needed, or keep as is)
-                    if (newRow.studentPhone) newRow.studentPhone = newRow.studentPhone.replace(/[^0-9+]/g, '');
-                    if (newRow.parentPhone) newRow.parentPhone = newRow.parentPhone.replace(/[^0-9+]/g, '');
+                    if (newRow.studentPhone) {
+                        newRow.studentPhone = newRow.studentPhone.replace(/[^0-9+]/g, '');
+                        // Add leading zero if missing and doesn't start with +
+                        if (newRow.studentPhone && !newRow.studentPhone.startsWith('0') && !newRow.studentPhone.startsWith('+')) {
+                            newRow.studentPhone = '0' + newRow.studentPhone;
+                        }
+                    }
+                    if (newRow.parentPhone) {
+                        newRow.parentPhone = newRow.parentPhone.replace(/[^0-9+]/g, '');
+                        // Add leading zero if missing and doesn't start with +
+                        if (newRow.parentPhone && !newRow.parentPhone.startsWith('0') && !newRow.parentPhone.startsWith('+')) {
+                            newRow.parentPhone = '0' + newRow.parentPhone;
+                        }
+                    }
 
                     return newRow;
                 }).filter(r => r !== null);
@@ -308,20 +350,34 @@ document.getElementById('session-form').addEventListener('submit', async (e) => 
 
         const sessionId = response.data?.id || id; // Use returned ID or existing ID
 
-        // 2. Handle File Upload (Create or Update)
+        // 2. Handle File Upload OR Merged Data
         const fileInput = document.getElementById('students-file');
+        let studentsToUpload = null;
+
         if (fileInput.files.length > 0) {
+            // Parse uploaded file
             try {
                 saveBtn.textContent = 'Uploading students...';
-                const students = await parseImportFile(fileInput.files[0]);
-
-                if (students.length > 0) {
-                    await window.api.makeRequest('POST', `/activities/call-sessions/${sessionId}/students`, { students });
-                }
+                studentsToUpload = await parseImportFile(fileInput.files[0]);
             } catch (fileError) {
                 console.error('File processing error:', fileError);
                 showAlert('Session created, but failed to upload students: ' + fileError.message, 'error');
-                // Don't return here, still close modal and reload
+            }
+        } else if (window.mergedStudentsData && window.mergedStudentsData.length > 0) {
+            // Use merged data if available
+            studentsToUpload = window.mergedStudentsData;
+            saveBtn.textContent = 'Uploading merged students...';
+        }
+
+        // Upload students if we have any
+        if (studentsToUpload && studentsToUpload.length > 0) {
+            try {
+                await window.api.makeRequest('POST', `/activities/call-sessions/${sessionId}/students`, { students: studentsToUpload });
+                // Clear merged data after successful upload
+                window.mergedStudentsData = null;
+            } catch (uploadError) {
+                console.error('Upload error:', uploadError);
+                showAlert('Session created, but failed to upload students: ' + uploadError.message, 'error');
             }
         }
 
@@ -337,6 +393,27 @@ document.getElementById('session-form').addEventListener('submit', async (e) => 
         saveBtn.textContent = originalBtnText;
     }
 });
+
+// End Session
+async function endSession(id) {
+    if (!confirm('Are you sure you want to end this session? It will be marked as completed and saved.')) return;
+
+    try {
+        const response = await window.api.makeRequest('PUT', `/activities/call-sessions/${id}`, {
+            status: 'completed'
+        });
+
+        if (response.success) {
+            showAlert('Session ended successfully');
+            loadSessions();
+        } else {
+            showAlert('Failed to end session', 'error');
+        }
+    } catch (error) {
+        console.error('Error ending session:', error);
+        showAlert('Error ending session', 'error');
+    }
+}
 
 // Delete functions
 function openDeleteModal(id) {
@@ -460,6 +537,34 @@ studentsModal.addEventListener('click', (e) => {
 loadAssistants();
 loadSessions();
 
+// Check for merged data from merge-files page
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('autoCreate') === 'true') {
+    const mergedDataStr = sessionStorage.getItem('mergedStudentsData');
+    if (mergedDataStr) {
+        try {
+            const mergedData = JSON.parse(mergedDataStr);
+            // Clear the session storage
+            sessionStorage.removeItem('mergedStudentsData');
+
+            // Show alert
+            showAlert(`Loaded ${mergedData.length} students from merged file. Please create a session to use them.`);
+
+            // Store in a global variable for use when creating session
+            window.mergedStudentsData = mergedData;
+
+            // Auto-open create modal after a short delay
+            setTimeout(() => {
+                openSessionModal();
+                showAlert(`Ready to create session with ${mergedData.length} merged students`, 'info');
+            }, 500);
+        } catch (error) {
+            console.error('Error loading merged data:', error);
+        }
+    }
+}
+
+
 // Monitor Modal Functions
 const monitorModal = document.getElementById('monitor-modal');
 
@@ -563,6 +668,8 @@ displaySessions = function (sessions) {
 
     // Add new listeners
     document.querySelectorAll('.monitor-btn').forEach(btn => {
-        btn.addEventListener('click', () => openMonitorModal(btn.dataset.id));
+        btn.addEventListener('click', () => {
+            window.location.href = `monitor-session.html?session=${btn.dataset.id}`;
+        });
     });
 };

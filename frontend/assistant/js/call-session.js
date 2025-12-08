@@ -31,9 +31,9 @@ const currentStudentEl = document.getElementById('current-student');
 const totalStudentsEl = document.getElementById('total-students');
 
 const callStudentBtn = document.getElementById('call-student');
-const copyStudentBtn = document.getElementById('copy-student');
+const whatsappStudentBtn = document.getElementById('whatsapp-student');
 const callParentBtn = document.getElementById('call-parent');
-const copyParentBtn = document.getElementById('copy-parent');
+const whatsappParentBtn = document.getElementById('whatsapp-parent');
 
 const addCommentBtn = document.getElementById('add-comment-btn');
 const commentModal = document.getElementById('comment-modal');
@@ -253,6 +253,65 @@ function displayStudent(student) {
     currentStudentEl.textContent = 'Active';
     totalStudentsEl.textContent = 'Session';
 
+    // Display optional fields if they exist
+    const studentIdEl = document.getElementById('student-id');
+    const centerEl = document.getElementById('center');
+    const examMarkEl = document.getElementById('exam-mark');
+    const studentIdGroup = document.getElementById('student-id-group');
+    const centerGroup = document.getElementById('center-group');
+    const examMarkGroup = document.getElementById('exam-mark-group');
+    const optionalSection = document.getElementById('optional-info-section');
+
+    let hasOptionalInfo = false;
+
+    if (student.studentId) {
+        studentIdEl.value = student.studentId;
+        studentIdGroup.style.display = 'block';
+        hasOptionalInfo = true;
+    } else {
+        studentIdGroup.style.display = 'none';
+    }
+
+    if (student.center) {
+        centerEl.value = student.center;
+        centerGroup.style.display = 'block';
+        hasOptionalInfo = true;
+    } else {
+        centerGroup.style.display = 'none';
+    }
+
+    if (student.examMark !== undefined && student.examMark !== null && student.examMark !== '') {
+        examMarkEl.value = student.examMark;
+        examMarkGroup.style.display = 'block';
+        hasOptionalInfo = true;
+    } else {
+        examMarkGroup.style.display = 'none';
+    }
+
+    // Attendance Status
+    const attendanceStatusEl = document.getElementById('attendance-status');
+    const attendanceStatusGroup = document.getElementById('attendance-status-group');
+
+    if (student.attendanceStatus) {
+        attendanceStatusEl.value = student.attendanceStatus;
+        attendanceStatusGroup.style.display = 'block';
+        hasOptionalInfo = true;
+
+        // Color code based on status
+        if (student.attendanceStatus.toLowerCase().includes('absent')) {
+            attendanceStatusEl.style.color = '#ef4444'; // Red for absent
+        } else if (student.attendanceStatus.toLowerCase().includes('present')) {
+            attendanceStatusEl.style.color = '#10b981'; // Green for present
+        } else {
+            attendanceStatusEl.style.color = 'var(--text-primary)';
+        }
+    } else {
+        attendanceStatusGroup.style.display = 'none';
+    }
+
+    // Show optional section only if at least one field has data
+    optionalSection.style.display = hasOptionalInfo ? 'block' : 'none';
+
     // Load comments
     loadComments(student.comments);
 
@@ -303,14 +362,30 @@ function setupEventListeners() {
         if (phone) window.location.href = `tel:${phone}`;
     });
 
-    copyStudentBtn.addEventListener('click', () => copyToClipboard(studentPhoneEl.value));
+    whatsappStudentBtn.addEventListener('click', () => {
+        const phone = studentPhoneEl.value.replace(/[^0-9]/g, '');
+        if (phone) window.open(`https://wa.me/${phone}`, '_blank');
+    });
+
+    // Click to copy for student phone
+    studentPhoneEl.addEventListener('click', () => {
+        if (studentPhoneEl.value) copyToClipboard(studentPhoneEl.value);
+    });
 
     callParentBtn.addEventListener('click', () => {
         const phone = parentPhoneEl.value.replace(/\s/g, '');
         if (phone) window.location.href = `tel:${phone}`;
     });
 
-    copyParentBtn.addEventListener('click', () => copyToClipboard(parentPhoneEl.value));
+    whatsappParentBtn.addEventListener('click', () => {
+        const phone = parentPhoneEl.value.replace(/[^0-9]/g, '');
+        if (phone) window.open(`https://wa.me/${phone}`, '_blank');
+    });
+
+    // Click to copy for parent phone
+    parentPhoneEl.addEventListener('click', () => {
+        if (parentPhoneEl.value) copyToClipboard(parentPhoneEl.value);
+    });
 
     // Comment modal
     addCommentBtn.addEventListener('click', openCommentModal);

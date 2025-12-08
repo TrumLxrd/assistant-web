@@ -870,16 +870,23 @@ const assignNextStudent = async (req, res) => {
 
         // 2. Find next available student
         // Criteria: Not completed (filter_status empty) AND (Unassigned OR Lock expired)
+        // Priority: Absent students first, then Present students
         const lockThreshold = new Date(Date.now() - LOCK_TIMEOUT_MINUTES * 60000);
 
-        const nextStudent = await CallSessionStudent.findOneAndUpdate(
+        const baseQuery = {
+            call_session_id: id,
+            filter_status: '',
+            $or: [
+                { assigned_to: null },
+                { assigned_at: { $lt: lockThreshold } }
+            ]
+        };
+
+        // Try to find an absent student first
+        let nextStudent = await CallSessionStudent.findOneAndUpdate(
             {
-                call_session_id: id,
-                filter_status: '',
-                $or: [
-                    { assigned_to: null },
-                    { assigned_at: { $lt: lockThreshold } }
-                ]
+                ...baseQuery,
+                attendance_status: { $regex: /absent/i }
             },
             {
                 $set: {
@@ -887,8 +894,22 @@ const assignNextStudent = async (req, res) => {
                     assigned_at: new Date()
                 }
             },
-            { new: true, sort: { name: 1 } } // Sort alphabetically or by _id
+            { new: true, sort: { name: 1 } }
         );
+
+        // If no absent student found, find any available student
+        if (!nextStudent) {
+            nextStudent = await CallSessionStudent.findOneAndUpdate(
+                baseQuery,
+                {
+                    $set: {
+                        assigned_to: userId,
+                        assigned_at: new Date()
+                    }
+                },
+                { new: true, sort: { name: 1 } }
+            );
+        }
 
         if (!nextStudent) {
             return res.json({
@@ -919,6 +940,10 @@ const assignNextStudent = async (req, res) => {
             name: nextStudent.name,
             studentPhone: nextStudent.student_phone,
             parentPhone: nextStudent.parent_phone,
+            studentId: nextStudent.student_id || '',
+            center: nextStudent.center || '',
+            examMark: nextStudent.exam_mark !== undefined && nextStudent.exam_mark !== null ? nextStudent.exam_mark : '',
+            attendanceStatus: nextStudent.attendance_status || '',
             filterStatus: nextStudent.filter_status,
             comments: nextStudent.comments,
             howMany: nextStudent.how_many,
@@ -976,7 +1001,11 @@ const importCallSessionStudents = async (req, res) => {
             call_session_id: id,
             name: student.name,
             student_phone: student.studentPhone || '',
-            parent_phone: student.parentPhone || ''
+            parent_phone: student.parentPhone || '',
+            student_id: student.studentId || '',
+            center: student.center || '',
+            exam_mark: student.examMark !== undefined && student.examMark !== null ? student.examMark : null,
+            attendance_status: student.attendanceStatus || ''
         }));
 
         await CallSessionStudent.insertMany(studentRecords);
@@ -1048,6 +1077,10 @@ const getCallSessionStudents = async (req, res) => {
             name: s.name,
             studentPhone: s.student_phone,
             parentPhone: s.parent_phone,
+            studentId: s.student_id || '',
+            center: s.center || '',
+            examMark: s.exam_mark !== undefined && s.exam_mark !== null ? s.exam_mark : '',
+            attendanceStatus: s.attendance_status || '',
             filterStatus: s.filter_status,
             comments: s.comments,
             howMany: s.how_many,
