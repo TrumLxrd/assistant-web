@@ -1468,9 +1468,9 @@ const deleteCallSessionStudent = async (req, res) => {
         // Validate studentId is a valid MongoDB ObjectId
         console.log('Validating student ID:', studentId);
         console.log('Is studentId truthy:', !!studentId);
-        console.log('Is valid ObjectId:', mongoose.Types.ObjectId.isValid(studentId));
+        console.log('Is valid ObjectId:', mongoose.isValidObjectId(studentId));
 
-        if (!studentId || !mongoose.Types.ObjectId.isValid(studentId)) {
+        if (!studentId || !mongoose.isValidObjectId(studentId)) {
             console.log('Invalid student ID:', studentId);
             return res.status(400).json({
                 success: false,
@@ -1499,15 +1499,20 @@ const deleteCallSessionStudent = async (req, res) => {
         console.log('Deleting student:', student.name, 'from session:', student.call_session_id);
 
         // Log the deletion for audit purposes (only if user is authenticated)
-        const auditLogger = require('../utils/auditLogger');
-        if (req.user && req.user.id) {
-            await auditLogger.logActivity(req.user.id, 'DELETE_STUDENT', {
-                studentId: studentId,
-                studentName: student.name,
-                sessionId: student.call_session_id
-            });
-        } else {
-            console.warn('Cannot log audit: User not authenticated');
+        try {
+            const auditLogger = require('../utils/auditLogger');
+            if (req.user && req.user.id) {
+                await auditLogger.logAuditAction(req.user.id, 'DELETE_STUDENT', {
+                    studentId: studentId,
+                    studentName: student.name,
+                    sessionId: student.call_session_id
+                });
+            } else {
+                console.warn('Cannot log audit: User not authenticated');
+            }
+        } catch (auditError) {
+            console.error('Audit logging failed:', auditError.message);
+            // Continue with deletion even if audit logging fails
         }
 
         const deleteResult = await CallSessionStudent.findByIdAndDelete(studentId);

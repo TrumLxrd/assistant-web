@@ -60,6 +60,7 @@ router.post('/call-sessions/:id/assign', assignNextStudent); // Assign/Get Next
 router.get('/call-sessions/:id/students', getCallSessionStudents); // Both admin and assistant can view
 router.put('/call-sessions/students/:studentId', updateCallSessionStudent); // Assistant updates status/comment
 router.delete('/call-sessions/students/:studentId', deleteCallSessionStudent); // Allow deleting students (temporarily removed admin check for testing)
+router.post('/call-sessions/students/:studentId/remove', deleteCallSessionStudent); // Alternative POST endpoint for removal
 
 // Activity Log routes (Admin only)
 router.post('/logs', checkRole('admin'), createActivityLog);

@@ -644,7 +644,10 @@ async function deleteStudent(index) {
 
     if (student._id || student.id) {
         const sId = student._id || student.id;
+        console.log('Student to delete:', student);
+        console.log('Student ID:', sId);
         console.log('Making DELETE request to:', `/activities/call-sessions/students/${sId}`);
+
         try {
             const res = await window.api.makeRequest('DELETE', `/activities/call-sessions/students/${sId}`);
             console.log('DELETE response:', res);
@@ -652,11 +655,26 @@ async function deleteStudent(index) {
                 showAlert('Student removed');
                 loadStudents();
             } else {
+                console.warn('DELETE failed with response:', res);
                 showAlert('Failed to remove: ' + res.message, 'error');
             }
         } catch (err) {
             console.error('DELETE error:', err);
-            showAlert('Failed to remove student: ' + err.message, 'error');
+
+            // Show detailed error message
+            let errorMsg = 'Failed to remove student';
+            if (err.message.includes('fetch')) {
+                errorMsg += ': Network error (check server connection)';
+            } else if (err.message.includes('401')) {
+                errorMsg += ': Authentication required';
+            } else if (err.message.includes('403')) {
+                errorMsg += ': Access denied';
+            } else if (err.message.includes('404')) {
+                errorMsg += ': Student not found';
+            } else {
+                errorMsg += ': ' + err.message;
+            }
+            showAlert(errorMsg, 'error');
         }
     } else {
         console.error('Student has no _id or id field:', student);

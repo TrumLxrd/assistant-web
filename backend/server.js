@@ -39,7 +39,12 @@ const allowedOrigins = [
     `https://localhost:${PORT}`,
     `https://localhost:5000`,
     `https://127.0.0.1:${PORT}`,
-    `https://127.0.0.1:5000`
+    `https://127.0.0.1:5000`,
+    // Additional development origins
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:8080',
+    'http://127.0.0.1:8080'
 ].filter(Boolean);
 
 app.use(cors({
@@ -205,6 +210,18 @@ if (process.env.VERCEL !== '1') {
         console.error('Failed to connect to MongoDB in Vercel:', err);
     });
 }
+
+// Handle uncaught exceptions to prevent server crashes
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    console.error('Stack trace:', error.stack);
+    // Don't exit the process, just log the error
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    // Don't exit the process, just log the error
+});
 
 // Export app for Vercel serverless function
 module.exports = app;
