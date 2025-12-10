@@ -186,6 +186,73 @@
 
         <!-- Students Table -->
         <div class="card">
+            <!-- Filters Section -->
+            <div class="card" style="margin-bottom: 2rem;">
+                <h3 style="margin-bottom: 1rem; font-size: 1rem; color: var(--text-secondary);">Filters</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
+                    <!-- Search (Name/Phone) -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <input type="text" id="filter-search" class="form-input" placeholder="Search Name or Phone...">
+                    </div>
+
+                    <!-- Assistant Filter -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <select id="filter-assistant" class="form-select">
+                            <option value="">All Assistants</option>
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+
+                    <!-- Status Filter -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <select id="filter-status" class="form-select">
+                            <option value="">All Call Statuses</option>
+                            <option value="pending">Pending</option>
+                            <option value="wrong-number">Wrong Number</option>
+                            <option value="no-answer">No Answer</option>
+                            <option value="online-makeup">Online Makeup</option>
+                            <option value="left-teacher">Left Teacher</option>
+                            <option value="other-makeup">Other Makeup</option>
+                            <option value="tired">Tired</option>
+                        </select>
+                    </div>
+
+                    <!-- Attendance Filter -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <select id="filter-attendance" class="form-select">
+                            <option value="">All Attendance</option>
+                            <option value="present">Present</option>
+                            <option value="absent">Absent</option>
+                        </select>
+                    </div>
+
+                    <!-- Homework Filter -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <select id="filter-homework" class="form-select">
+                            <option value="">All Homework</option>
+                            <option value="done">Done</option>
+                            <option value="not evaluated">Not Evaluated</option>
+                            <option value="not complete">Not Complete</option>
+                            <option value="empty">Empty (No Data)</option>
+                        </select>
+                    </div>
+
+                    <!-- Center Filter -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <select id="filter-center" class="form-select">
+                            <option value="">All Centers</option>
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+
+                    <!-- Exam Mark Filter -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <input type="text" id="filter-exam-mark" class="form-input"
+                            placeholder="Filter by Exam Mark...">
+                    </div>
+                </div>
+            </div>
+
             <div class="actions-bar">
                 <h2 style="margin: 0;">Students List</h2>
                 <div style="display: flex; gap: 1rem;">
@@ -197,7 +264,7 @@
                         </svg>
                         Add Student
                     </button>
-                    <input type="text" id="search-input" class="form-input search-box" placeholder="Search students...">
+                    <!-- Old search input removed from here -->
                 </div>
             </div>
 

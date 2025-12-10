@@ -85,7 +85,8 @@ async function loadStudents() {
         const response = await window.api.makeRequest('GET', `/activities/call-sessions/${currentSessionId}/students`);
         if (response.success) {
             currentStudents = response.data;
-            renderStudentsTable(currentStudents);
+            populateFilters();
+            applyFilters();
             updateStats();
         } else {
             tbody.innerHTML = '<tr><td colspan="7" class="text-center">Failed to load students</td></tr>';
@@ -557,6 +558,118 @@ function exportStudents() {
     }
 }
 
+// Populate dynamic filters (Assistants, Centers)
+function populateFilters() {
+    const assistantsSet = new Set();
+    const centersSet = new Set();
+
+    currentStudents.forEach(s => {
+        if (s.lastCalledBy) assistantsSet.add(s.lastCalledBy);
+        if (s.assignedTo) assistantsSet.add(s.assignedTo);
+        if (s.center) centersSet.add(s.center);
+    });
+
+    // Populate Assistant Filter
+    const assistantSelect = document.getElementById('filter-assistant');
+    // Keep first option (All)
+    const currentAssistant = assistantSelect.value;
+    assistantSelect.innerHTML = '<option value="">All Assistants</option>';
+
+    Array.from(assistantsSet).sort().forEach(a => {
+        const option = document.createElement('option');
+        option.value = a;
+        option.textContent = a;
+        assistantSelect.appendChild(option);
+    });
+    assistantSelect.value = currentAssistant; // Restore selection
+
+    // Populate Center Filter
+    const centerSelect = document.getElementById('filter-center');
+    const currentCenter = centerSelect.value;
+    centerSelect.innerHTML = '<option value="">All Centers</option>';
+
+    Array.from(centersSet).sort().forEach(c => {
+        const option = document.createElement('option');
+        option.value = c;
+        option.textContent = c;
+        centerSelect.appendChild(option);
+    });
+    centerSelect.value = currentCenter; // Restore selection
+}
+
+// Apply Filters
+function applyFilters() {
+    const searchTerm = document.getElementById('filter-search').value.toLowerCase();
+    const assistantFilter = document.getElementById('filter-assistant').value;
+    const statusFilter = document.getElementById('filter-status').value;
+    const attendanceFilter = document.getElementById('filter-attendance').value;
+    const homeworkFilter = document.getElementById('filter-homework').value;
+    const centerFilter = document.getElementById('filter-center').value;
+    const examMarkFilter = document.getElementById('filter-exam-mark').value.toLowerCase();
+
+    const filteredStudents = currentStudents.filter(s => {
+        // Search (Name/Phone)
+        if (searchTerm) {
+            const name = (s.name || '').toLowerCase();
+            const sPhone = (s.studentPhone || '').toLowerCase();
+            const pPhone = (s.parentPhone || '').toLowerCase();
+            if (!name.includes(searchTerm) && !sPhone.includes(searchTerm) && !pPhone.includes(searchTerm)) {
+                return false;
+            }
+        }
+
+        // Assistant
+        if (assistantFilter) {
+            const calledBy = s.lastCalledBy || '';
+            const assignedTo = s.assignedTo || '';
+            if (calledBy !== assistantFilter && assignedTo !== assistantFilter) {
+                return false;
+            }
+        }
+
+        // Status
+        if (statusFilter) {
+            const status = (s.filterStatus || 'pending').toLowerCase();
+            if (status !== statusFilter) return false;
+        }
+
+        // Attendance
+        if (attendanceFilter) {
+            const att = (s.attendanceStatus || '').toLowerCase();
+            if (!att.includes(attendanceFilter)) return false;
+        }
+
+        // Homework
+        if (homeworkFilter) {
+            const hw = (s.homeworkStatus || '').toLowerCase().trim();
+            if (homeworkFilter === 'done') {
+                if (!hw.includes('done') && !hw.includes('completed') && hw !== 'yes') return false;
+            } else if (homeworkFilter === 'not evaluated') {
+                if (!hw.includes('not evaluated') && !hw.includes('pending')) return false;
+            } else if (homeworkFilter === 'not complete') {
+                if (!hw.includes('not complete') && !hw.includes('incomplete') && hw !== 'no') return false;
+            } else if (homeworkFilter === 'empty') {
+                if (hw !== '') return false;
+            }
+        }
+
+        // Center
+        if (centerFilter) {
+            if (s.center !== centerFilter) return false;
+        }
+
+        // Exam Mark
+        if (examMarkFilter) {
+            const mark = String(s.examMark || '').toLowerCase();
+            if (!mark.includes(examMarkFilter)) return false;
+        }
+
+        return true;
+    });
+
+    renderStudentsTable(filteredStudents);
+}
+
 // Setup Listeners
 function setupEventListeners() {
     document.getElementById('import-btn').addEventListener('click', () => {
@@ -571,18 +684,15 @@ function setupEventListeners() {
 
     document.getElementById('export-btn').addEventListener('click', exportStudents);
 
-    document.getElementById('search-input').addEventListener('input', (e) => {
-        const term = e.target.value.toLowerCase();
-        const rows = document.querySelectorAll('#students-table-body tr');
-        rows.forEach(row => {
-            const name = row.cells[0].textContent.toLowerCase();
-            const phone = row.cells[1].textContent;
-            if (name.includes(term) || phone.includes(term)) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
-            }
-        });
+    // Filter Listeners
+    const filterInputs = [
+        'filter-search', 'filter-assistant', 'filter-status',
+        'filter-attendance', 'filter-homework', 'filter-center', 'filter-exam-mark'
+    ];
+
+    filterInputs.forEach(id => {
+        document.getElementById(id).addEventListener('input', applyFilters);
+        document.getElementById(id).addEventListener('change', applyFilters);
     });
 
     document.getElementById('add-student-btn').addEventListener('click', () => {
