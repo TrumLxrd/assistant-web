@@ -73,6 +73,15 @@ const callSessionStudentSchema = new mongoose.Schema({
     assigned_at: {
         type: Date,
         default: null
+    },
+    round_two_assigned_to: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+    },
+    round_two_assigned_at: {
+        type: Date,
+        default: null
     }
 }, {
     timestamps: true

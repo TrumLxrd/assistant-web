@@ -46,6 +46,9 @@ const commentsListEl = document.getElementById('comments-list');
 const prevStudentBtn = document.getElementById('prev-student');
 const nextStudentBtn = document.getElementById('next-student');
 
+const roundOneBtn = document.getElementById('round-one-btn');
+const roundTwoBtn = document.getElementById('round-two-btn');
+
 const filterButtons = document.querySelectorAll('.filter-btn');
 
 // Data
@@ -55,6 +58,7 @@ let currentStudentIndex = 0;
 let historyMode = false;
 let historyOffset = 0; // 0 = last processed, 1 = one before that, etc.
 let isOnline = navigator.onLine;
+let isRoundTwoMode = false; // Track if we're in round two mode
 const STORAGE_KEY = `call_session_${sessionId}`;
 
 // Connection Status Management
@@ -83,6 +87,50 @@ window.addEventListener('online', () => {
 window.addEventListener('offline', () => {
     updateConnectionStatus();
 });
+
+// Round Mode Functions
+function setRoundMode(isRoundTwo) {
+    isRoundTwoMode = isRoundTwo;
+
+    // Update button styles
+    if (isRoundTwo) {
+        roundOneBtn.classList.remove('active');
+        roundOneBtn.style.background = 'white';
+        roundOneBtn.style.color = 'var(--text-secondary)';
+
+        roundTwoBtn.classList.add('active');
+        roundTwoBtn.style.background = 'var(--primary)';
+        roundTwoBtn.style.color = 'white';
+    } else {
+        roundTwoBtn.classList.remove('active');
+        roundTwoBtn.style.background = 'white';
+        roundTwoBtn.style.color = 'var(--text-secondary)';
+
+        roundOneBtn.classList.add('active');
+        roundOneBtn.style.background = 'var(--primary)';
+        roundOneBtn.style.color = 'white';
+    }
+
+    // Clear current student when switching modes
+    students = [];
+    currentStudentIndex = 0;
+    showNoStudentsMessage();
+    saveSessionState();
+}
+
+async function checkRoundTwoAvailability() {
+    try {
+        // Check if round two is enabled for this session
+        const response = await window.api.makeRequest('GET', `/activities/call-sessions/${sessionId}`);
+        if (response.success && response.data.status === 'active') {
+            // For now, we'll assume round two is available if the session is active
+            // In a more sophisticated implementation, you might check if round two was started by admin
+            roundTwoBtn.style.display = 'inline-block';
+        }
+    } catch (error) {
+        console.error('Error checking round two availability:', error);
+    }
+}
 
 // State Persistence Functions
 function saveSessionState() {
@@ -142,6 +190,9 @@ async function init() {
 
     // Always load session data to get latest info
     await loadSessionData();
+
+    // Check if round two is available
+    await checkRoundTwoAvailability();
 
     if (restored && students.length > 0 && students[0]) {
         // Check if the restored student already has a filter status (completed)
@@ -273,7 +324,8 @@ async function loadNextStudent() {
         commentsListEl.innerHTML = '';
         filterButtons.forEach(b => b.classList.remove('active'));
 
-        const response = await window.api.makeRequest('POST', `/activities/call-sessions/${sessionId}/assign`);
+        const endpoint = isRoundTwoMode ? `/activities/call-sessions/${sessionId}/assign-round-two` : `/activities/call-sessions/${sessionId}/assign`;
+        const response = await window.api.makeRequest('POST', endpoint);
 
         if (response.success) {
             if (response.data) {
@@ -354,7 +406,7 @@ function displayStudent(student) {
 
     // We don't know total count easily here without another API call, so maybe just show "Current"
     currentStudentEl.textContent = 'Active';
-    totalStudentsEl.textContent = 'Session';
+    totalStudentsEl.textContent = isRoundTwoMode ? 'Round 2' : 'Session';
 
     // Display optional fields if they exist
     const studentIdEl = document.getElementById('student-id');
@@ -493,6 +545,15 @@ function setupEventListeners() {
     if (prevStudentBtn) {
         prevStudentBtn.addEventListener('click', loadPreviousStudent);
     }
+
+    // Mode toggle buttons
+    roundOneBtn.addEventListener('click', () => {
+        setRoundMode(false);
+    });
+
+    roundTwoBtn.addEventListener('click', () => {
+        setRoundMode(true);
+    });
 
     // Phone actions
     callStudentBtn.addEventListener('click', () => {

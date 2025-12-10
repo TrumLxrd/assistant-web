@@ -10,6 +10,7 @@ if (!window.api.isAuthenticated() || !user || user.role !== 'admin') {
 let currentSessionId = null;
 let currentSessionData = null;
 let currentStudents = []; // Array of student objects
+let roundTwoEnabled = false; // Track if round two is active
 
 // Get session ID from URL
 const urlParams = new URLSearchParams(window.location.search);
@@ -69,6 +70,16 @@ async function loadSessionDetails() {
             statusEl.textContent = status.charAt(0).toUpperCase() + status.slice(1);
             if (status === 'completed') statusEl.style.color = 'var(--accent-green)';
             else statusEl.style.color = 'var(--accent-blue)';
+
+            // Show/hide round two button based on session status
+            const roundTwoBtn = document.getElementById('round-two-btn');
+            if (status === 'active') {
+                roundTwoBtn.style.display = 'inline-flex';
+            } else {
+                roundTwoBtn.style.display = 'none';
+                roundTwoEnabled = false;
+                hideRoundTwoColumns();
+            }
         }
     } catch (error) {
         console.error('Error loading session:', error);
@@ -79,7 +90,8 @@ async function loadSessionDetails() {
 // Load Students
 async function loadStudents() {
     const tbody = document.getElementById('students-table-body');
-    tbody.innerHTML = '<tr><td colspan="13" class="text-center">Loading students...</td></tr>';
+    const colspan = roundTwoEnabled ? 16 : 14;
+    tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center">Loading students...</td></tr>`;
 
     try {
         const response = await window.api.makeRequest('GET', `/activities/call-sessions/${currentSessionId}/students`);
@@ -89,11 +101,11 @@ async function loadStudents() {
             applyFilters();
             updateStats();
         } else {
-            tbody.innerHTML = '<tr><td colspan="13" class="text-center">Failed to load students</td></tr>';
+            tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center">Failed to load students</td></tr>`;
         }
     } catch (error) {
         console.error('Error loading students:', error);
-        tbody.innerHTML = '<tr><td colspan="13" class="text-center">Error loading students</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center">Error loading students</td></tr>`;
     }
 }
 
@@ -101,8 +113,9 @@ async function loadStudents() {
 function renderStudentsTable(students) {
     const tbody = document.getElementById('students-table-body');
 
+    const colspan = roundTwoEnabled ? 16 : 14;
     if (students.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="13" class="text-center">No students found. Import or add some!</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center">No students found. Import or add some!</td></tr>`;
         return;
     }
 
@@ -153,6 +166,14 @@ function renderStudentsTable(students) {
                         </button>
                     </div>
                 </td>
+                ${roundTwoEnabled ? `
+                <td>
+                    ${s.filterStatus === 'no-answer' ? '<span style="color: var(--accent-orange); font-weight: 600;">Eligible</span>' : '<span style="color: var(--text-secondary);">Not Eligible</span>'}
+                </td>
+                <td>
+                    ${s.roundTwoAssignedTo ? `<span style="color: var(--accent-purple); font-weight: 500;">${s.roundTwoAssignedTo}</span>` : '-'}
+                </td>
+                ` : ''}
             </tr>
         `;
     }).join('');
@@ -458,6 +479,52 @@ function showUndoButton(undoToken, expiresInMs) {
     });
 }
 
+// Round Two Functions
+async function startRoundTwo() {
+    if (!confirm('Are you sure you want to start Round Two? This will enable reassignment of "no-answer" students to assistants for a second attempt.')) {
+        return;
+    }
+
+    try {
+        const response = await window.api.makeRequest('POST', `/activities/call-sessions/${currentSessionId}/start-round-two`);
+
+        if (response.success) {
+            roundTwoEnabled = true;
+            showRoundTwoColumns();
+            showAlert(`Round Two started! ${response.data.round_two_students_count} students available for reassignment.`, 'success');
+            await loadStudents(); // Reload to show round two data
+        } else {
+            showAlert('Failed to start round two', 'error');
+        }
+    } catch (error) {
+        console.error('Error starting round two:', error);
+        showAlert('Error starting round two', 'error');
+    }
+}
+
+function showRoundTwoColumns() {
+    document.getElementById('round-two-header').style.display = 'table-cell';
+    document.getElementById('round-two-assigned-header').style.display = 'table-cell';
+
+    // Update colspan for loading/error messages
+    const tbody = document.getElementById('students-table-body');
+    const loadingRow = tbody.querySelector('tr td[colspan]');
+    if (loadingRow) {
+        loadingRow.setAttribute('colspan', '16');
+    }
+}
+
+function hideRoundTwoColumns() {
+    document.getElementById('round-two-header').style.display = 'none';
+    document.getElementById('round-two-assigned-header').style.display = 'none';
+
+    // Update colspan for loading/error messages
+    const tbody = document.getElementById('students-table-body');
+    const loadingRow = tbody.querySelector('tr td[colspan]');
+    if (loadingRow) {
+        loadingRow.setAttribute('colspan', '14');
+    }
+}
 
 // Edit Modal
 const studentModal = document.getElementById('student-modal');
@@ -803,6 +870,8 @@ function setupEventListeners() {
     });
 
     document.getElementById('export-btn').addEventListener('click', exportStudents);
+
+    document.getElementById('round-two-btn').addEventListener('click', startRoundTwo);
 
     // Filter Listeners
     const filterInputs = [

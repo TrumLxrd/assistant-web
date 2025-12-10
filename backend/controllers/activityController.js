@@ -2171,6 +2171,216 @@ const undoImportStudents = async (req, res) => {
     }
 };
 
+/**
+ * Start Round Two - Assign no-answer students for second attempt
+ * POST /api/activities/call-sessions/:id/start-round-two
+ */
+const startRoundTwo = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const session = await CallSession.findById(id);
+        if (!session) {
+            return res.status(404).json({
+                success: false,
+                message: 'Call session not found'
+            });
+        }
+
+        if (session.status !== 'active') {
+            return res.status(400).json({
+                success: false,
+                message: 'Round two can only be started for active sessions'
+            });
+        }
+
+        // Find all students with 'no-answer' status who haven't been assigned for round two
+        const noAnswerStudents = await CallSessionStudent.find({
+            call_session_id: id,
+            filter_status: 'no-answer',
+            round_two_assigned_to: null
+        });
+
+        if (noAnswerStudents.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'No students found with "no-answer" status available for round two'
+            });
+        }
+
+        await logAuditAction(req.user.id, 'START_ROUND_TWO', {
+            session_id: id,
+            students_count: noAnswerStudents.length
+        });
+
+        res.status(200).json({
+            success: true,
+            message: `Round two started successfully. ${noAnswerStudents.length} students available for reassignment.`,
+            data: {
+                round_two_students_count: noAnswerStudents.length,
+                round_two_enabled: true
+            }
+        });
+
+    } catch (error) {
+        console.error('Start round two error:', error);
+        await logError(error, {
+            action: 'startRoundTwo',
+            sessionId: req.params.id
+        }, req);
+
+        res.status(500).json({
+            success: false,
+            message: 'Error starting round two'
+        });
+    }
+};
+
+/**
+ * Assign Next Round Two Student
+ * POST /api/activities/call-sessions/:id/assign-round-two
+ */
+const assignNextRoundTwoStudent = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        const LOCK_TIMEOUT_MINUTES = 15;
+
+        const session = await CallSession.findById(id);
+        if (!session) {
+            return res.status(404).json({ success: false, message: 'Session not found' });
+        }
+
+        if (session.status !== 'active') {
+            return res.status(400).json({ success: false, message: 'Session is not active' });
+        }
+
+        // 1. Check if user already has an assigned round two student
+        const currentRoundTwoAssignment = await CallSessionStudent.findOne({
+            call_session_id: id,
+            round_two_assigned_to: userId,
+            filter_status: 'no-answer'
+        });
+
+        if (currentRoundTwoAssignment) {
+            // Return the current assignment
+            const formattedStudent = {
+                id: currentRoundTwoAssignment._id,
+                name: currentRoundTwoAssignment.name,
+                studentId: currentRoundTwoAssignment.student_id,
+                studentPhone: currentRoundTwoAssignment.student_phone,
+                parentPhone: currentRoundTwoAssignment.parent_phone,
+                center: currentRoundTwoAssignment.center,
+                examMark: currentRoundTwoAssignment.exam_mark,
+                attendanceStatus: currentRoundTwoAssignment.attendance_status,
+                homeworkStatus: currentRoundTwoAssignment.homework_status,
+                filterStatus: currentRoundTwoAssignment.filter_status,
+                comments: currentRoundTwoAssignment.comments || [],
+                assignedAt: currentRoundTwoAssignment.round_two_assigned_at,
+                isRoundTwo: true
+            };
+
+            return res.json({
+                success: true,
+                message: 'Current round two student assignment returned',
+                data: formattedStudent
+            });
+        }
+
+        // 2. Find an available no-answer student not assigned for round two
+        const availableStudent = await CallSessionStudent.findOne({
+            call_session_id: id,
+            filter_status: 'no-answer',
+            round_two_assigned_to: null
+        }).sort({ createdAt: 1 }); // Oldest first
+
+        if (!availableStudent) {
+            return res.status(404).json({
+                success: false,
+                message: 'No round two students available for assignment'
+            });
+        }
+
+        // 3. Assign the student for round two
+        availableStudent.round_two_assigned_to = userId;
+        availableStudent.round_two_assigned_at = new Date();
+        await availableStudent.save();
+
+        await logAuditAction(userId, 'ASSIGN_ROUND_TWO_STUDENT', {
+            session_id: id,
+            student_id: availableStudent._id.toString()
+        });
+
+        // 4. Calculate stats
+        const totalRoundTwoStudents = await CallSessionStudent.countDocuments({
+            call_session_id: id,
+            filter_status: 'no-answer'
+        });
+
+        const completedRoundTwo = await CallSessionStudent.countDocuments({
+            call_session_id: id,
+            filter_status: 'no-answer',
+            round_two_assigned_to: { $ne: null }
+        });
+
+        const remainingRoundTwo = totalRoundTwoStudents - completedRoundTwo;
+
+        const userRoundTwoCompleted = await CallSessionStudent.countDocuments({
+            call_session_id: id,
+            filter_status: 'no-answer',
+            round_two_assigned_to: req.user.id
+        });
+
+        const sendResponse = (student) => {
+            const formattedStudent = {
+                id: student._id,
+                name: student.name,
+                studentId: student.student_id,
+                studentPhone: student.student_phone,
+                parentPhone: student.parent_phone,
+                center: student.center,
+                examMark: student.exam_mark,
+                attendanceStatus: student.attendance_status,
+                homeworkStatus: student.homework_status,
+                filterStatus: student.filter_status,
+                comments: student.comments || [],
+                assignedAt: student.round_two_assigned_at,
+                isRoundTwo: true
+            };
+
+            res.json({
+                success: true,
+                message: 'Round two student assigned',
+                data: {
+                    student: formattedStudent,
+                    stats: {
+                        total: totalRoundTwoStudents,
+                        completed: completedRoundTwo,
+                        remaining: remainingRoundTwo,
+                        userCompleted: userRoundTwoCompleted
+                    }
+                }
+            });
+        };
+
+        sendResponse(availableStudent);
+
+    } catch (error) {
+        console.error('Assign round two student error:', error);
+        await logError(error, {
+            action: 'assignNextRoundTwoStudent',
+            sessionId: req.params.id,
+            userId: req.user.id
+        }, req);
+
+        res.status(500).json({
+            success: false,
+            message: 'Error assigning round two student',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     // WhatsApp Schedule
     createWhatsAppSchedule,
@@ -2188,6 +2398,8 @@ module.exports = {
     // Call Session Students
     importCallSessionStudents,
     undoImportStudents,
+    startRoundTwo,
+    assignNextRoundTwoStudent,
     getCallSessionStudents,
     updateCallSessionStudent,
     assignNextStudent,

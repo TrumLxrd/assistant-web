@@ -198,6 +198,13 @@
                     </svg>
                     Export
                 </button>
+                <button class="btn btn-outline" id="round-two-btn" style="background: var(--accent-orange); border: none; color: white; display: none;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    Start Round Two
+                </button>
             </div>
         </div>
 
@@ -319,11 +326,13 @@
                             <th>Assigned To</th>
                             <th>Last Comment</th>
                             <th style="width: 100px;">Actions</th>
+                            <th id="round-two-header" style="display: none; background: var(--accent-orange); color: white;">Round Two</th>
+                            <th id="round-two-assigned-header" style="display: none; background: var(--accent-orange); color: white;">Round Two Assigned</th>
                         </tr>
                     </thead>
                     <tbody id="students-table-body">
                         <tr>
-                            <td colspan="12" class="text-center">Loading students...</td>
+                            <td colspan="14" class="text-center">Loading students...</td>
                         </tr>
                     </tbody>
                 </table>
