@@ -79,7 +79,7 @@ async function loadSessionDetails() {
 // Load Students
 async function loadStudents() {
     const tbody = document.getElementById('students-table-body');
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center">Loading students...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13" class="text-center">Loading students...</td></tr>';
 
     try {
         const response = await window.api.makeRequest('GET', `/activities/call-sessions/${currentSessionId}/students`);
@@ -89,11 +89,11 @@ async function loadStudents() {
             applyFilters();
             updateStats();
         } else {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center">Failed to load students</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="13" class="text-center">Failed to load students</td></tr>';
         }
     } catch (error) {
         console.error('Error loading students:', error);
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center">Error loading students</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" class="text-center">Error loading students</td></tr>';
     }
 }
 
@@ -102,7 +102,7 @@ function renderStudentsTable(students) {
     const tbody = document.getElementById('students-table-body');
 
     if (students.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center">No students found. Import or add some!</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" class="text-center">No students found. Import or add some!</td></tr>';
         return;
     }
 
@@ -118,8 +118,8 @@ function renderStudentsTable(students) {
 
         return `
             <tr data-index="${index}">
-                <td>${s.name}</td>
                 <td>${s.studentId || '-'}</td>
+                <td>${s.name}</td>
                 <td>${s.studentPhone || '-'}</td>
                 <td>${s.parentPhone || '-'}</td>
                 <td>${s.center || '-'}</td>
