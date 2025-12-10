@@ -615,6 +615,73 @@ const startCallSession = async (req, res) => {
             });
         }
 
+        // Check if assistant is active in any other call sessions
+        const activeSessions = await CallSession.find({
+            assistants: assistantId,
+            status: 'active',
+            _id: { $ne: id } // Exclude the current session we're trying to join
+        });
+
+        // If assistant is active in other sessions, automatically end them
+        if (activeSessions.length > 0) {
+            console.log(`Auto-ending ${activeSessions.length} active sessions for assistant ${assistantId}`);
+            for (const activeSession of activeSessions) {
+                // Find and end the activity log for this assistant in the active session
+                const activityLog = await ActivityLog.findOne({
+                    call_session_id: activeSession._id,
+                    user_id: assistantId,
+                    end_time: null
+                });
+
+                if (activityLog) {
+                    const now = getCurrentEgyptTime();
+                    activityLog.end_time = now;
+                    // Calculate duration (ensure it's never negative)
+                    if (activityLog.start_time) {
+                        const startTime = new Date(activityLog.start_time);
+                        const durationMs = now.getTime() - startTime.getTime();
+                        const durationMinutes = Math.round(durationMs / (1000 * 60));
+
+                        // If start time is in the future (due to test data or timezone issues),
+                        // set duration to 0 and log a warning
+                        if (durationMinutes < 0) {
+                            console.warn(`Activity log ${activityLog._id} has future start_time, setting duration to 0`);
+                            activityLog.duration_minutes = 0;
+                        } else {
+                            activityLog.duration_minutes = durationMinutes;
+                        }
+                    }
+
+                    // Calculate completed students count for this assistant in this session
+                    const completedCount = await CallSessionStudent.countDocuments({
+                        call_session_id: activeSession._id,
+                        assigned_to: assistantId,
+                        filter_status: { $ne: '' } // Only count students with a status (completed)
+                    });
+                    activityLog.completed_count = completedCount;
+
+                    try {
+                        await activityLog.save();
+                    } catch (saveError) {
+                        console.error('Error saving auto-ended activity log:', saveError);
+                        // Continue anyway - don't fail the session start
+                    }
+                }
+
+                // Remove assistant from the active assistants list
+                if (activeSession.assistants && activeSession.assistants.length > 0) {
+                    activeSession.assistants = activeSession.assistants.filter(aid => aid.toString() !== assistantIdStr);
+                    await activeSession.save();
+                }
+
+                await logAuditAction(assistantId, 'AUTO_END_CALL_SESSION', {
+                    session_id: activeSession._id.toString(),
+                    reason: 'Assistant joined another session',
+                    new_session_id: id
+                });
+            }
+        }
+
         // Check if date is today
         const now = getCurrentEgyptTime();
         const sessionDate = moment.tz(session.date, 'Africa/Cairo').startOf('day');
@@ -1317,7 +1384,20 @@ const generateWhatsAppRecordsForDate = async (targetDate) => {
  */
 const getActivityLogs = async (req, res) => {
     try {
-        const { user_id, type, start_date, end_date, page = 1, limit = 50 } = req.query;
+        const {
+            user_id,
+            type,
+            status,
+            call_session_id,
+            start_date,
+            end_date,
+            duration_min,
+            duration_max,
+            students_min,
+            students_max,
+            page = 1,
+            limit = 50
+        } = req.query;
 
         // Lazy-create: Generate missing WhatsApp records for the date range
         if (start_date && end_date) {
@@ -1334,6 +1414,16 @@ const getActivityLogs = async (req, res) => {
         const query = { is_deleted: false };
         if (user_id) query.user_id = user_id;
         if (type) query.type = type;
+        if (call_session_id) query.call_session_id = call_session_id;
+
+        // Status filter (active = end_time is null, completed = end_time exists)
+        if (status === 'active') {
+            query.end_time = null;
+        } else if (status === 'completed') {
+            query.end_time = { $ne: null };
+        }
+
+        // Date range filter
         if (start_date || end_date) {
             query.start_time = {};
             if (start_date) {
@@ -1342,6 +1432,13 @@ const getActivityLogs = async (req, res) => {
             if (end_date) {
                 query.start_time.$lte = moment.tz(end_date, 'Africa/Cairo').endOf('day').toDate();
             }
+        }
+
+        // Duration filters
+        if (duration_min || duration_max) {
+            query.duration_minutes = {};
+            if (duration_min) query.duration_minutes.$gte = parseInt(duration_min);
+            if (duration_max) query.duration_minutes.$lte = parseInt(duration_max);
         }
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -1359,9 +1456,41 @@ const getActivityLogs = async (req, res) => {
             ActivityLog.countDocuments(query)
         ]);
 
-        const formattedLogs = logs.map(log => {
+        // Get students handled count for call sessions
+        const callSessionIds = logs
+            .filter(log => log.type === 'call' && log.call_session_id)
+            .map(log => log.call_session_id._id);
+
+        let studentsHandledCounts = {};
+        if (callSessionIds.length > 0) {
+            // Get unique user-call_session combinations
+            const userSessionPairs = logs
+                .filter(log => log.type === 'call' && log.call_session_id && log.user_id)
+                .map(log => ({
+                    userId: log.user_id._id,
+                    sessionId: log.call_session_id._id
+                }));
+
+            // Count students for each user-session pair
+            for (const pair of userSessionPairs) {
+                const count = await CallSessionStudent.countDocuments({
+                    call_session_id: pair.sessionId,
+                    assigned_to: pair.userId
+                });
+                studentsHandledCounts[`${pair.userId}_${pair.sessionId}`] = count;
+            }
+        }
+
+        let formattedLogs = logs.map(log => {
             const startMoment = moment.tz(log.start_time, 'Africa/Cairo');
             const endMoment = log.end_time ? moment.tz(log.end_time, 'Africa/Cairo') : null;
+
+            // Get students handled count for call sessions
+            let studentsHandledCount = 0;
+            if (log.type === 'call' && log.call_session_id && log.user_id) {
+                const key = `${log.user_id._id}_${log.call_session_id._id}`;
+                studentsHandledCount = studentsHandledCounts[key] || 0;
+            }
 
             return {
                 id: log._id,
@@ -1371,6 +1500,7 @@ const getActivityLogs = async (req, res) => {
                 start_time: log.start_time,
                 end_time: log.end_time,
                 duration_minutes: log.duration_minutes || 0,
+                students_handled_count: studentsHandledCount,
                 call_session_id: log.call_session_id?._id || null,
                 call_session_name: log.call_session_id?.name || null,
                 whatsapp_schedule_id: log.whatsapp_schedule_id?._id || null,
@@ -1384,14 +1514,30 @@ const getActivityLogs = async (req, res) => {
             };
         });
 
+        // Apply students count filters after formatting
+        if (students_min || students_max) {
+            formattedLogs = formattedLogs.filter(log => {
+                const count = log.students_handled_count;
+                const minCheck = !students_min || count >= parseInt(students_min);
+                const maxCheck = !students_max || count <= parseInt(students_max);
+                return minCheck && maxCheck;
+            });
+        }
+
+        // Recalculate pagination based on filtered results
+        const filteredTotal = formattedLogs.length;
+        const startIndex = (parseInt(page) - 1) * parseInt(limit);
+        const endIndex = startIndex + parseInt(limit);
+        const paginatedLogs = formattedLogs.slice(startIndex, endIndex);
+
         res.json({
             success: true,
-            data: formattedLogs,
+            data: paginatedLogs,
             pagination: {
                 page: parseInt(page),
                 limit: parseInt(limit),
-                total,
-                pages: Math.ceil(total / parseInt(limit))
+                total: filteredTotal,
+                pages: Math.ceil(filteredTotal / parseInt(limit))
             }
         });
     } catch (error) {

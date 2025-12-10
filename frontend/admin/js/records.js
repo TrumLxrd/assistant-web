@@ -61,9 +61,25 @@ function populateUserDropdowns() {
     }
 }
 
-// Load sessions for dropdown (not needed for records, but keeping for potential future use)
+// Load sessions for filter dropdown
 async function loadSessions() {
-    // Not needed for activity records, but keeping function for consistency
+    try {
+        const response = await window.api.makeRequest('GET', '/activities/call-sessions?limit=100');
+        if (response.success) {
+            allSessions = response.data;
+            populateSessionDropdown();
+        }
+    } catch (error) {
+        console.error('Error loading sessions:', error);
+    }
+}
+
+function populateSessionDropdown() {
+    const sessionSelect = document.getElementById('filter-session');
+    if (sessionSelect) {
+        sessionSelect.innerHTML = '<option value="">All Sessions</option>' +
+            allSessions.map(session => `<option value="${session.id}">${session.name}</option>`).join('');
+    }
 }
 
 // Load activity records with filters and pagination
@@ -105,7 +121,7 @@ function displayRecords(records) {
     if (!records || records.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" class="text-center">No activity records found.</td>
+                <td colspan="8" class="text-center">No activity records found.</td>
             </tr>
         `;
         return;
@@ -126,19 +142,24 @@ function displayRecords(records) {
             ? '<span class="badge badge-primary">WhatsApp</span>'
             : '<span class="badge badge-success">Call</span>';
 
-        // Completed count display
-        const completedStr = (record.type === 'call' && record.completed_count !== undefined)
-            ? `<span style="font-weight: 500;">${record.completed_count}</span>`
+        // Students handled count display
+        const callSessionStr = record.call_session_name
+            ? `<span style="font-weight: 500;">${record.call_session_name}</span>`
+            : '<span style="color: #9ca3af;">-</span>';
+
+        const studentsHandledStr = (record.type === 'call' && record.students_handled_count !== undefined)
+            ? `<span style="font-weight: 500;">${record.students_handled_count}</span>`
             : '<span style="color: #9ca3af;">-</span>';
 
         return `
             <tr data-id="${record.id}">
                 <td>${record.user_name || 'Unknown'}</td>
                 <td>${typeBadge}</td>
+                <td>${callSessionStr}</td>
                 <td>${startTimeStr}</td>
                 <td>${endTimeStr}</td>
                 <td>${durationStr}</td>
-                <td>${completedStr}</td>
+                <td>${studentsHandledStr}</td>
                 <td>
                     <div class="table-actions" style="display: flex; gap: 0.5rem;">
                         <button class="btn-icon edit-record-btn" data-id="${record.id}" title="Edit">
@@ -211,8 +232,14 @@ document.getElementById('apply-filters-btn').addEventListener('click', () => {
     const filters = {
         user_id: document.getElementById('filter-user').value || undefined,
         type: document.getElementById('filter-type').value || undefined,
+        status: document.getElementById('filter-status').value || undefined,
+        call_session_id: document.getElementById('filter-session').value || undefined,
         start_date: document.getElementById('filter-date-from').value || undefined,
-        end_date: document.getElementById('filter-date-to').value || undefined
+        end_date: document.getElementById('filter-date-to').value || undefined,
+        duration_min: document.getElementById('filter-duration-min').value || undefined,
+        duration_max: document.getElementById('filter-duration-max').value || undefined,
+        students_min: document.getElementById('filter-students-min').value || undefined,
+        students_max: document.getElementById('filter-students-max').value || undefined
     };
 
     // Remove undefined values
@@ -225,11 +252,75 @@ document.getElementById('apply-filters-btn').addEventListener('click', () => {
 document.getElementById('reset-filters-btn').addEventListener('click', () => {
     document.getElementById('filter-user').value = '';
     document.getElementById('filter-type').value = '';
+    document.getElementById('filter-status').value = '';
+    document.getElementById('filter-session').value = '';
     document.getElementById('filter-date-from').value = '';
     document.getElementById('filter-date-to').value = '';
+    document.getElementById('filter-duration-min').value = '';
+    document.getElementById('filter-duration-max').value = '';
+    document.getElementById('filter-students-min').value = '';
+    document.getElementById('filter-students-max').value = '';
     document.getElementById('search-input').value = '';
     currentFilters = {};
     loadRecords({}, 1);
+});
+
+// Advanced filters toggle
+document.getElementById('toggle-advanced-filters').addEventListener('click', () => {
+    const advancedFilters = document.getElementById('advanced-filters');
+    const toggleBtn = document.getElementById('toggle-advanced-filters');
+    const isVisible = advancedFilters.style.display !== 'none';
+
+    if (isVisible) {
+        // Hide with animation
+        advancedFilters.style.maxHeight = advancedFilters.scrollHeight + 'px';
+        advancedFilters.style.overflow = 'hidden';
+        setTimeout(() => {
+            advancedFilters.style.maxHeight = '0px';
+            advancedFilters.style.paddingTop = '0px';
+            advancedFilters.style.paddingBottom = '0px';
+        }, 10);
+
+        setTimeout(() => {
+            advancedFilters.style.display = 'none';
+            advancedFilters.style.maxHeight = '';
+            advancedFilters.style.overflow = '';
+            advancedFilters.style.paddingTop = '';
+            advancedFilters.style.paddingBottom = '';
+        }, 300);
+
+        toggleBtn.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 0.25rem;">
+                <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+            Advanced
+        `;
+    } else {
+        // Show with animation
+        advancedFilters.style.display = 'block';
+        advancedFilters.style.maxHeight = '0px';
+        advancedFilters.style.overflow = 'hidden';
+        advancedFilters.style.paddingTop = '0px';
+        advancedFilters.style.paddingBottom = '0px';
+
+        setTimeout(() => {
+            advancedFilters.style.maxHeight = advancedFilters.scrollHeight + 'px';
+            advancedFilters.style.paddingTop = '1rem';
+            advancedFilters.style.paddingBottom = '1rem';
+        }, 10);
+
+        setTimeout(() => {
+            advancedFilters.style.maxHeight = '';
+            advancedFilters.style.overflow = '';
+        }, 300);
+
+        toggleBtn.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 0.25rem;">
+                <polyline points="18 15 12 9 6 15"></polyline>
+            </svg>
+            Advanced
+        `;
+    }
 });
 
 // Pagination
@@ -529,5 +620,6 @@ deleteModal.addEventListener('click', (e) => {
 
 // Initialize
 loadUsers();
+loadSessions();
 loadRecords({}, 1);
 
