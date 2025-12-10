@@ -3,7 +3,6 @@
 
 /**
  * Initialize Vercel Analytics
- * Call this function after the analytics script has loaded
  */
 function initVercelAnalytics() {
     // Load the analytics script dynamically
@@ -12,19 +11,23 @@ function initVercelAnalytics() {
     script.async = true;
 
     script.onload = function() {
-        // Initialize analytics after script loads
-        if (window.VercelAnalytics) {
-            window.VercelAnalytics.inject();
+        try {
+            // Use the inject function from the loaded script
+            if (window.VercelAnalytics && window.VercelAnalytics.inject) {
+                window.VercelAnalytics.inject();
 
-            // Track page view
-            if (window.VercelAnalytics.track) {
-                window.VercelAnalytics.track('page_view', {
-                    page: window.location.pathname,
-                    timestamp: new Date().toISOString()
-                });
+                // Track initial page view
+                if (window.VercelAnalytics.track) {
+                    window.VercelAnalytics.track('page_view', {
+                        page: window.location.pathname,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+
+                console.log('Vercel Analytics initialized');
             }
-
-            console.log('Vercel Analytics initialized');
+        } catch (error) {
+            console.warn('Failed to initialize Vercel Analytics:', error);
         }
     };
 
@@ -42,11 +45,15 @@ function initVercelAnalytics() {
  */
 function trackEvent(eventName, properties = {}) {
     if (window.VercelAnalytics && window.VercelAnalytics.track) {
-        window.VercelAnalytics.track(eventName, {
-            ...properties,
-            timestamp: new Date().toISOString(),
-            page: window.location.pathname
-        });
+        try {
+            window.VercelAnalytics.track(eventName, {
+                ...properties,
+                timestamp: new Date().toISOString(),
+                page: window.location.pathname
+            });
+        } catch (error) {
+            console.warn('Failed to track event:', error);
+        }
     }
 }
 
