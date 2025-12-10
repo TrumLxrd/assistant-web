@@ -590,6 +590,63 @@ const updateCallSession = async (req, res) => {
             }
         }
 
+        // If admin manually sets status to 'completed', force-end all active sessions
+        if (updateData.status === 'completed' && updatedSession.status === 'completed') {
+            const now = getCurrentEgyptTime();
+
+            // Set end_time if not already set
+            if (!updatedSession.end_time) {
+                updatedSession.end_time = now;
+                await updatedSession.save();
+            }
+
+            // Update all related activity logs with end_time and calculate duration
+            const activityLogs = await ActivityLog.find({
+                call_session_id: id,
+                end_time: null
+            });
+
+            console.log(`Force-ending ${activityLogs.length} active sessions for call session ${id}`);
+
+            for (const log of activityLogs) {
+                log.end_time = updatedSession.end_time;
+                // Calculate duration
+                if (log.start_time) {
+                    const durationMs = updatedSession.end_time.getTime() - log.start_time.getTime();
+                    const durationMinutes = Math.round(durationMs / (1000 * 60));
+
+                    // If start time is in the future (due to test data or timezone issues),
+                    // set duration to 0 and log a warning
+                    if (durationMinutes < 0) {
+                        console.warn(`Activity log ${log._id} has future start_time, setting duration to 0`);
+                        log.duration_minutes = 0;
+                    } else {
+                        log.duration_minutes = durationMinutes;
+                    }
+                }
+
+                // Calculate completed students count for this assistant in this session
+                const completedCount = await CallSessionStudent.countDocuments({
+                    call_session_id: id,
+                    assigned_to: log.user_id,
+                    filter_status: { $ne: '' } // Only count students with a status (completed)
+                });
+                log.completed_count = completedCount;
+
+                await log.save();
+
+                await logAuditAction(req.user.id, 'FORCE_END_CALL_SESSION', {
+                    session_id: id,
+                    assistant_id: log.user_id.toString(),
+                    reason: 'Admin ended call session'
+                });
+            }
+
+            // Clear all assistants from the session
+            updatedSession.assistants = [];
+            await updatedSession.save();
+        }
+
         await logAuditAction(req.user.id, 'UPDATE_CALL_SESSION', {
             session_id: id,
             ...updateData
@@ -1195,7 +1252,12 @@ const importCallSessionStudents = async (req, res) => {
                             center: student.center || '',
                             exam_mark: student.examMark !== undefined && student.examMark !== null ? student.examMark : null,
                             attendance_status: student.attendanceStatus || '',
-                            homework_status: student.homeworkStatus || ''
+                            homework_status: student.homeworkStatus || '',
+                            imported_at: new Date() // Track when this student was imported
+                        },
+                        $setOnInsert: {
+                            created_at: new Date(),
+                            filter_status: '' // Only set on insert
                         }
                     },
                     upsert: true
@@ -1203,18 +1265,35 @@ const importCallSessionStudents = async (req, res) => {
             };
         });
 
+        let importedCount = 0;
+        let updatedCount = 0;
+
         if (bulkOps.length > 0) {
-            await CallSessionStudent.bulkWrite(bulkOps);
+            const result = await CallSessionStudent.bulkWrite(bulkOps);
+            importedCount = result.upsertedCount || 0;
+            updatedCount = result.modifiedCount || 0;
         }
 
         await logAuditAction(req.user.id, 'IMPORT_CALL_SESSION_STUDENTS', {
             session_id: id,
-            count: students.length
+            count: students.length,
+            imported: importedCount,
+            updated: updatedCount
         });
+
+        // Generate an undo token that expires in 10 minutes
+        const undoToken = `${id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
         res.status(200).json({
             success: true,
-            message: `${students.length} students processed (merged/imported) successfully`
+            message: `${students.length} students processed (merged/imported) successfully`,
+            data: {
+                total_processed: students.length,
+                imported: importedCount,
+                updated: updatedCount,
+                undo_token: undoToken,
+                undo_expires_in: 10 * 60 * 1000 // 10 minutes in milliseconds
+            }
         });
     } catch (error) {
         console.error('Import students error:', error);
@@ -2004,6 +2083,94 @@ const deleteActivityLog = async (req, res) => {
     }
 };
 
+/**
+ * Undo Import Students
+ * POST /api/activities/call-sessions/:id/undo-import
+ */
+const undoImportStudents = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { undo_token } = req.body;
+
+        if (!undo_token) {
+            return res.status(400).json({
+                success: false,
+                message: 'Undo token is required'
+            });
+        }
+
+        // Parse undo token: sessionId_timestamp_randomString
+        const [tokenSessionId, timestampStr] = undo_token.split('_');
+
+        if (tokenSessionId !== id) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid undo token for this session'
+            });
+        }
+
+        const importTimestamp = new Date(parseInt(timestampStr));
+        const now = new Date();
+
+        // Check if undo is still valid (within 10 minutes)
+        const timeDiff = now - importTimestamp;
+        const maxUndoTime = 10 * 60 * 1000; // 10 minutes
+
+        if (timeDiff > maxUndoTime) {
+            return res.status(400).json({
+                success: false,
+                message: 'Undo time has expired (10 minutes limit)'
+            });
+        }
+
+        // Find students imported after the timestamp
+        const studentsToRemove = await CallSessionStudent.find({
+            call_session_id: id,
+            imported_at: { $gte: importTimestamp }
+        });
+
+        if (studentsToRemove.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'No students found to undo'
+            });
+        }
+
+        // Remove the students
+        const result = await CallSessionStudent.deleteMany({
+            call_session_id: id,
+            imported_at: { $gte: importTimestamp }
+        });
+
+        await logAuditAction(req.user.id, 'UNDO_IMPORT_STUDENTS', {
+            session_id: id,
+            removed_count: result.deletedCount,
+            import_timestamp: importTimestamp
+        });
+
+        res.status(200).json({
+            success: true,
+            message: `Successfully removed ${result.deletedCount} recently imported students`,
+            data: {
+                removed_count: result.deletedCount
+            }
+        });
+
+    } catch (error) {
+        console.error('Undo import students error:', error);
+        await logError(error, {
+            action: 'undoImportStudents',
+            sessionId: req.params.id,
+            undoToken: req.body.undo_token
+        }, req);
+
+        res.status(500).json({
+            success: false,
+            message: 'Error undoing student import'
+        });
+    }
+};
+
 module.exports = {
     // WhatsApp Schedule
     createWhatsAppSchedule,
@@ -2020,6 +2187,7 @@ module.exports = {
     stopCallSession,
     // Call Session Students
     importCallSessionStudents,
+    undoImportStudents,
     getCallSessionStudents,
     updateCallSessionStudent,
     assignNextStudent,

@@ -368,12 +368,94 @@ async function saveStudentsList(studentsList) {
 
         if (response.success) {
             await loadStudents(); // Reload from server to get new IDs etc.
+
+            // Show undo button if undo data is available
+            if (response.data && response.data.undo_token) {
+                showUndoButton(response.data.undo_token, response.data.undo_expires_in);
+            }
         } else {
             throw new Error(response.message || 'Save failed');
         }
     } catch (error) {
         throw error;
     }
+}
+
+// Undo Import Functionality
+function showUndoButton(undoToken, expiresInMs) {
+    // Remove any existing undo button
+    const existingUndo = document.getElementById('undo-import-btn');
+    if (existingUndo) {
+        existingUndo.remove();
+    }
+
+    // Create undo button
+    const undoBtn = document.createElement('button');
+    undoBtn.id = 'undo-import-btn';
+    undoBtn.className = 'btn btn-sm btn-outline undo-btn';
+    undoBtn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3,12 9,6 21,18"></polyline>
+            <path d="m3,12 9,6 9-6"></path>
+        </svg>
+        Undo Import (<span id="undo-timer">10:00</span>)
+    `;
+
+    // Insert after the import button
+    const importBtn = document.getElementById('import-btn');
+    importBtn.parentNode.insertBefore(undoBtn, importBtn.nextSibling);
+
+    // Start countdown timer
+    let timeLeft = Math.floor(expiresInMs / 1000);
+    const timerElement = document.getElementById('undo-timer');
+
+    const countdown = setInterval(() => {
+        timeLeft--;
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+        if (timeLeft <= 0) {
+            clearInterval(countdown);
+            undoBtn.remove();
+        }
+    }, 1000);
+
+    // Add click handler
+    undoBtn.addEventListener('click', async () => {
+        if (!confirm('Are you sure you want to undo the last import? This will remove the recently added students.')) {
+            return;
+        }
+
+        try {
+            undoBtn.disabled = true;
+            undoBtn.textContent = 'Undoing...';
+
+            const response = await window.api.makeRequest('POST', `/activities/call-sessions/${currentSessionId}/undo-import`, {
+                undo_token: undoToken
+            });
+
+            if (response.success) {
+                showAlert(`Successfully removed ${response.data.removed_count} recently imported students`);
+                await loadStudents(); // Reload the students list
+                clearInterval(countdown); // Stop the timer
+                undoBtn.remove(); // Remove the button
+            } else {
+                throw new Error(response.message || 'Undo failed');
+            }
+        } catch (error) {
+            console.error('Undo error:', error);
+            showAlert('Failed to undo import: ' + (error.response?.data?.message || error.message), 'error');
+            undoBtn.disabled = false;
+            undoBtn.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3,12 9,6 21,18"></polyline>
+                    <path d="m3,12 9,6 9-6"></path>
+                </svg>
+                Undo Import (<span id="undo-timer">${timeLeft > 0 ? Math.floor(timeLeft / 60) + ':' + (timeLeft % 60).toString().padStart(2, '0') : '00:00'}</span>)
+            `;
+        }
+    });
 }
 
 

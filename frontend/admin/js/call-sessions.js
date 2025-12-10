@@ -444,7 +444,7 @@ document.getElementById('session-form').addEventListener('submit', async (e) => 
 
 // End Session
 async function endSession(id) {
-    if (!confirm('Are you sure you want to end this session? It will be marked as completed and saved.')) return;
+    if (!confirm('Are you sure you want to end this session? This will force-end all active assistants and mark the session as completed.')) return;
 
     try {
         const response = await window.api.makeRequest('PUT', `/activities/call-sessions/${id}`, {
@@ -452,7 +452,7 @@ async function endSession(id) {
         });
 
         if (response.success) {
-            showAlert('Session ended successfully');
+            showAlert('Session ended successfully - all active assistants have been force-ended');
             loadSessions();
         } else {
             showAlert('Failed to end session', 'error');

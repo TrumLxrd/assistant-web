@@ -96,6 +96,41 @@
                 background-color: transparent;
             }
         }
+
+        /* Undo Button Styling */
+        .undo-btn {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+            border: 1px solid #dc2626 !important;
+            color: white !important;
+            animation: pulse-red 2s infinite;
+        }
+
+        .undo-btn:hover {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
+            border-color: #b91c1c !important;
+            transform: translateY(-1px);
+        }
+
+        .undo-btn:disabled {
+            background: #9ca3af !important;
+            border-color: #9ca3af !important;
+            animation: none !important;
+            cursor: not-allowed !important;
+        }
+
+        @keyframes pulse-red {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+            }
+            50% {
+                box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+            }
+        }
+
+        #undo-timer {
+            font-weight: 600;
+            color: #fbbf24;
+        }
     </style>
 </head>
 

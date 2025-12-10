@@ -16,6 +16,7 @@ const {
     stopCallSession,
     // Call Session Students
     importCallSessionStudents,
+    undoImportStudents,
     getCallSessionStudents,
     updateCallSessionStudent,
     assignNextStudent,
@@ -49,6 +50,7 @@ router.post('/call-sessions/:id/stop', stopCallSession); // Both admin and assis
 
 // Call Session Student routes
 router.post('/call-sessions/:id/students', checkRole('admin'), importCallSessionStudents);
+router.post('/call-sessions/:id/undo-import', checkRole('admin'), undoImportStudents);
 router.post('/call-sessions/:id/assign', assignNextStudent); // Assign/Get Next
 router.get('/call-sessions/:id/students', getCallSessionStudents); // Both admin and assistant can view
 router.put('/call-sessions/students/:studentId', updateCallSessionStudent); // Assistant updates status/comment
