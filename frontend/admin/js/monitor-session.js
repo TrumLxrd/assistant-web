@@ -235,13 +235,56 @@ function updateStats() {
 
 // Import & Merge Logic
 function handleImport(file) {
+    // Validate file
+    if (!file) {
+        showAlert('No file selected', 'error');
+        return;
+    }
+
+    // Check file type
+    const validExtensions = ['.xlsx', '.xls', '.csv'];
+    const fileName = file.name.toLowerCase();
+    const isValidFile = validExtensions.some(ext => fileName.endsWith(ext));
+    
+    if (!isValidFile) {
+        showAlert('Invalid file type. Please select an Excel file (.xlsx, .xls) or CSV file.', 'error');
+        document.getElementById('import-file').value = ''; // Reset
+        return;
+    }
+
     const reader = new FileReader();
+    
+    reader.onerror = (error) => {
+        console.error('FileReader error:', error);
+        showAlert('Failed to read file. Please try again.', 'error');
+        document.getElementById('import-file').value = ''; // Reset
+    };
+
     reader.onload = async (e) => {
         try {
             const data = e.target.result;
-            const workbook = XLSX.read(data, { type: 'binary', cellDates: true });
+            
+            if (!data) {
+                throw new Error('File is empty or could not be read');
+            }
+
+            let workbook;
+            try {
+                workbook = XLSX.read(data, { type: 'binary', cellDates: true });
+            } catch (xlsxError) {
+                throw new Error('Invalid Excel file format: ' + xlsxError.message);
+            }
+
+            if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+                throw new Error('Excel file has no sheets');
+            }
+
             const sheetName = workbook.SheetNames[0];
             const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "" });
+
+            if (!jsonData || jsonData.length === 0) {
+                throw new Error('Excel file is empty or has no data rows');
+            }
 
             const importType = document.getElementById('import-type-monitor').value;
 
@@ -365,10 +408,21 @@ function handleImport(file) {
 
             if (addedCount === 0 && updatedCount === 0) {
                 showAlert('No new or updated students found in file.', 'info');
+                document.getElementById('import-file').value = ''; // Reset
                 return;
             }
 
-            if (!confirm(`Found ${addedCount} new students and ${updatedCount} updates. Proceed with merge?`)) return;
+            // Validate that we have at least some valid students
+            if (finalStudents.length === 0) {
+                showAlert('No valid students to import. Please check your file format.', 'error');
+                document.getElementById('import-file').value = ''; // Reset
+                return;
+            }
+
+            if (!confirm(`Found ${addedCount} new students and ${updatedCount} updates. Proceed with merge?`)) {
+                document.getElementById('import-file').value = ''; // Reset
+                return;
+            }
 
             // Send to backend
             // Since we need to update the FULL list essentially to handle the adds/updates properly and ensure ID consistency if backend replaces
@@ -383,13 +437,33 @@ function handleImport(file) {
 
             // Let's strip _id for NEW ones just in case, but keep for existing.
 
-            await saveStudentsList(finalStudents);
-            showAlert(`Successfully merged: ${addedCount} added, ${updatedCount} updated.`);
-            document.getElementById('import-file').value = ''; // Reset
+            try {
+                await saveStudentsList(finalStudents);
+                showAlert(`Successfully merged: ${addedCount} added, ${updatedCount} updated.`);
+            } catch (saveError) {
+                // Error is already handled in saveStudentsList and shown to user
+                throw saveError; // Re-throw to be caught by outer catch
+            } finally {
+                document.getElementById('import-file').value = ''; // Reset file input
+            }
 
         } catch (error) {
             console.error('Import error:', error);
-            showAlert('Failed to process file: ' + error.message, 'error');
+            console.error('Error details:', {
+                message: error.message,
+                stack: error.stack,
+                response: error.response
+            });
+            
+            // Show more detailed error message
+            let errorMessage = 'Failed to process file';
+            if (error.message) {
+                errorMessage += ': ' + error.message;
+            } else if (error.response && error.response.data) {
+                errorMessage += ': ' + (error.response.data.message || error.response.data.error || 'Unknown error');
+            }
+            
+            showAlert(errorMessage, 'error');
         }
     };
     reader.readAsBinaryString(file);
@@ -397,32 +471,37 @@ function handleImport(file) {
 
 async function saveStudentsList(studentsList) {
     try {
-        // We use the same endpoint as 'Create Session' which allows adding students.
-        // Actually, checking call-sessions.js, it uses POST /.../students. 
-        // We will stick to that. It typically expects a list of students to ADD/UPDATE.
-        // If the backend replaces the whole list, this is perfect. 
-        // If it appends, we might have duplicates if we send existing ones.
-        // SAFE METHOD: 
-        // If the API supports `PUT` to update the whole list, use that. 
-        // Assuming standard simplified implementation: try PUT to /students endpoint if it exists or POST with full list.
-        // Let's assume POST replaces for now based on typical small project patterns or handles upsert.
+        // Clean and format the students data before sending
+        const cleanedStudents = studentsList.map(student => {
+            const cleaned = {
+                name: student.name || '',
+                studentPhone: student.studentPhone || '',
+                parentPhone: student.parentPhone || '',
+                studentId: student.studentId || '',
+                center: student.center || '',
+                examMark: student.examMark !== undefined && student.examMark !== null && student.examMark !== '' ? student.examMark : '',
+                attendanceStatus: student.attendanceStatus || '',
+                homeworkStatus: student.homeworkStatus || '',
+                filterStatus: student.filterStatus || ''
+            };
 
-        // Actually, to be safe against duplication if POST appends:
-        // We should send ONLY the data needed. 
-        // But user asked to specific logic "don't duplicate".
-        // Let's try sending the whole list to a PUT endpoint if I can guess it exists, otherwise POST.
-        // I'll use the existing POST endpoint but logic suggests I might need to clarify backend behavior.
-        // Since I can't see backend code right now easily without switching contexts, I'll rely on the standard "Update Session" logic
-        // which might update the session's `students` array directly.
+            // Include MongoDB _id or id if it exists (for existing students)
+            if (student._id) {
+                cleaned._id = student._id;
+            } else if (student.id) {
+                cleaned.id = student.id;
+            }
 
-        // Re-reading `call-sessions.js`:
-        // It does `POST .../students` with `{ students }`. 
+            return cleaned;
+        });
+
+        console.log('Sending students to backend:', {
+            count: cleanedStudents.length,
+            sample: cleanedStudents.slice(0, 2)
+        });
 
         const response = await window.api.makeRequest('POST', `/activities/call-sessions/${currentSessionId}/students`, {
-            students: studentsList,
-            mode: 'replace' // HINT to backend if I implement it, or if it supports it.
-            // If backend ignores 'mode', and just appends, we have issues.
-            // But let's assume the Agent implementing Backend (me or previous) made it robust or I will edit backend next.
+            students: cleanedStudents
         });
 
         if (response.success) {
@@ -436,7 +515,23 @@ async function saveStudentsList(studentsList) {
             throw new Error(response.message || 'Save failed');
         }
     } catch (error) {
-        throw error;
+        console.error('Error in saveStudentsList:', error);
+        console.error('Error details:', {
+            message: error.message,
+            response: error.response,
+            status: error.status
+        });
+        
+        // Extract more detailed error message
+        let errorMessage = 'Failed to save students';
+        if (error.response) {
+            // Error response from makeRequest (has response property)
+            errorMessage = error.response.message || error.response.error || error.message || errorMessage;
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+        
+        throw new Error(errorMessage);
     }
 }
 
@@ -1028,15 +1123,31 @@ function applyFilters() {
 
 // Setup Listeners
 function setupEventListeners() {
-    document.getElementById('import-btn').addEventListener('click', () => {
-        document.getElementById('import-file').click();
-    });
+    const importBtn = document.getElementById('import-btn');
+    const importFile = document.getElementById('import-file');
+    
+    if (importBtn && importFile) {
+        // Ensure button is enabled and clickable
+        importBtn.disabled = false;
+        importBtn.style.pointerEvents = 'auto';
+        importBtn.style.cursor = 'pointer';
+        
+        importBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Import button clicked');
+            importFile.click();
+        });
 
-    document.getElementById('import-file').addEventListener('change', (e) => {
-        if (e.target.files.length > 0) {
-            handleImport(e.target.files[0]);
-        }
-    });
+        importFile.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                console.log('File selected:', e.target.files[0].name);
+                handleImport(e.target.files[0]);
+            }
+        });
+    } else {
+        console.error('Import button or file input not found when setting up event listener');
+    }
 
     document.getElementById('export-btn').addEventListener('click', exportStudents);
 

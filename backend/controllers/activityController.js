@@ -1411,17 +1411,20 @@ const importCallSessionStudents = async (req, res) => {
                     homework_status: student.homeworkStatus || '',
                     imported_at: importTimestamp // Track when imported
                 },
-                $setOnInsert: {
-                    filter_status: student.filterStatus || '' // Set filter_status on new inserts (use provided value or empty)
-                },
+                $setOnInsert: {},
                 $currentDate: {
                     updatedAt: true // Always update timestamp
                 }
             };
 
-            // If filterStatus is explicitly provided and not empty, update it even for existing records
+            // Handle filter_status: only set in one place to avoid MongoDB conflict
+            // If filterStatus is explicitly provided and not empty, update it in $set (for both new and existing)
+            // Otherwise, set it in $setOnInsert (only for new records)
             if (student.filterStatus !== undefined && student.filterStatus !== null && student.filterStatus !== '') {
                 updateOperation.$set.filter_status = student.filterStatus;
+            } else {
+                // Only set in $setOnInsert if not setting in $set (to avoid conflict)
+                updateOperation.$setOnInsert.filter_status = '';
             }
 
             return {

@@ -198,7 +198,11 @@ async function makeRequest(method, endpoint, data = null) {
                 }
             }
 
-            throw new Error(result.message || 'Request failed');
+            // Create error with message and attach full result for detailed error handling
+            const error = new Error(result.message || result.error || 'Request failed');
+            error.response = result;
+            error.status = response.status;
+            throw error;
         }
 
         return result;
