@@ -82,6 +82,10 @@ const callSessionStudentSchema = new mongoose.Schema({
     round_two_assigned_at: {
         type: Date,
         default: null
+    },
+    imported_at: {
+        type: Date,
+        default: null
     }
 }, {
     timestamps: true

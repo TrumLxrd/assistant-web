@@ -268,11 +268,19 @@ function parseImportFile(file) {
 
                 // Skip header row (first row)
                 const dataRows = jsonData.slice(1);
+                console.log(`📊 CSV parsed: ${jsonData.length} total rows in file, ${dataRows.length} data rows (after skipping header)`);
+                
+                // Debug: Log the first few rows to see structure
+                if (dataRows.length > 0) {
+                    console.log('Sample first row:', dataRows[0]);
+                    console.log('Sample last row:', dataRows[dataRows.length - 1]);
+                }
 
-                const normalizedData = dataRows.map(row => {
+                const normalizedData = dataRows.map((row, index) => {
                     const newRow = {};
 
                     // Flexible Column Mapping
+                    // IMPORTANT: Check Student ID FIRST before other checks to avoid conflicts
                     Object.keys(row).forEach(key => {
                         // Normalize key: removal all special chars, lowercase
                         const cleanKey = key.toString().toLowerCase().trim().replace(/[^a-z0-9]/g, '');
@@ -280,8 +288,16 @@ function parseImportFile(file) {
 
                         if (!val && val !== 0) return; // Skip empty values, but keep 0
 
-                        // Name detection
-                        if (['name', 'studentname', 'student'].includes(cleanKey)) {
+                        // Student ID - CHECK FIRST to avoid conflicts with "student" in name checks
+                        if (['studentid', 'id', 'code', 'studentcode'].includes(cleanKey)) {
+                            // Store as string, but keep original value for parsing
+                            const idValue = val !== null && val !== undefined ? String(val).trim() : '';
+                            if (idValue) {
+                                newRow.studentId = idValue;
+                            }
+                        }
+                        // Name detection (but exclude if it's actually an ID column)
+                        else if (['name', 'studentname'].includes(cleanKey) || (cleanKey === 'student' && !newRow.studentId)) {
                             newRow.name = val;
                         }
                         // Phone detection (Student)
@@ -300,10 +316,6 @@ function parseImportFile(file) {
                         else if (['center', 'location', 'branch', 'group'].includes(cleanKey)) {
                             newRow.center = val;
                         }
-                        // Student ID
-                        else if (['studentid', 'id', 'code', 'studentcode'].includes(cleanKey)) {
-                            newRow.studentId = val;
-                        }
                         // Attendance Status
                         else if (['attendancestatus', 'attendance', 'status', 'present', 'absent'].includes(cleanKey)) {
                             newRow.attendanceStatus = val;
@@ -315,11 +327,22 @@ function parseImportFile(file) {
                     });
 
                     // Validation: Must have at least a name
-                    if (!newRow.name) return null;
+                    if (!newRow.name) {
+                        console.warn(`❌ Row ${index + 2} (line ${index + 2}): Skipped - Missing name`, { row, mapped: newRow, studentId: newRow.studentId });
+                        return null;
+                    }
 
-                    // Skip if name looks like a header (contains common header words)
-                    const nameLower = newRow.name.toString().toLowerCase();
-                    if (nameLower.includes('name') || nameLower.includes('student') || nameLower.includes('id') || nameLower.length < 2) {
+                    // Skip if name looks like a header - only check exact matches
+                    const nameLower = newRow.name.toString().toLowerCase().trim();
+                    // Only filter if it's EXACTLY a header word, not if it contains it
+                    const headerWords = ['name', 'student', 'id', 'student name', 'student id', 'studentid', 'studentid'];
+                    if (headerWords.includes(nameLower)) {
+                        console.warn(`❌ Row ${index + 2} (line ${index + 2}): Skipped - Name looks like header`, { name: newRow.name, studentId: newRow.studentId, row });
+                        return null;
+                    }
+                    // Allow names that contain these words (like "student" in a real name)
+                    if (nameLower.length < 2) {
+                        console.warn(`❌ Row ${index + 2} (line ${index + 2}): Skipped - Name too short`, { name: newRow.name, studentId: newRow.studentId, row });
                         return null;
                     }
 
@@ -347,10 +370,48 @@ function parseImportFile(file) {
                         }
                     }
 
+                    // Debug: Log the 3 specific student IDs we're tracking
+                    const debugIds = ['1477', '2433', '2998'];
+                    if (newRow.studentId && debugIds.includes(String(newRow.studentId).trim())) {
+                        console.log(`✅ Parsed student with tracked ID ${newRow.studentId}:`, newRow.name);
+                    }
+                    
                     return newRow;
-                }).filter(r => r !== null);
+                }).filter(r => {
+                    if (r === null) return false;
+                    // Additional check: make sure we didn't accidentally filter tracked students
+                    const debugIds = ['1477', '2433', '2998'];
+                    if (r.studentId && debugIds.includes(String(r.studentId).trim())) {
+                        console.log(`✅ Student ${r.studentId} (${r.name}) passed all validations`);
+                    }
+                    return true;
+                });
 
-                console.log(`Mapped ${normalizedData.length} students from ${jsonData.length} rows.`);
+                console.log(`✅ Mapped ${normalizedData.length} valid students from ${jsonData.length} total rows (${dataRows.length} data rows after header).`);
+                
+                const filteredCount = dataRows.length - normalizedData.length;
+                if (filteredCount > 0) {
+                    console.error(`❌ ${filteredCount} rows were filtered out due to validation!`);
+                    console.error(`Expected ${dataRows.length} students, got ${normalizedData.length}`);
+                }
+                
+                // Debug: Check for the missing student IDs
+                const debugIds = ['1477', '2433', '2998'];
+                const foundDebugIds = [];
+                normalizedData.forEach(s => {
+                    const studentId = s.studentId ? String(s.studentId).trim() : null;
+                    if (studentId && debugIds.includes(studentId)) {
+                        foundDebugIds.push(studentId);
+                        console.log(`✅ Found student with ID ${studentId}:`, s.name, 'Phone:', s.studentPhone);
+                    }
+                });
+                
+                // Check which IDs are missing
+                const missingIds = debugIds.filter(id => !foundDebugIds.includes(id));
+                if (missingIds.length > 0) {
+                    console.error(`❌ MISSING STUDENT IDs: ${missingIds.join(', ')} - These were filtered out during parsing!`);
+                }
+                
                 resolve(normalizedData);
             } catch (error) {
                 console.error("Parsing error:", error);
@@ -427,23 +488,48 @@ document.getElementById('session-form').addEventListener('submit', async (e) => 
                 studentsToUpload.forEach(s => s.attendanceStatus = 'Present');
             }
 
-            // 2. Prevent Duplication (within this batch)
+            // 2. Prevent Duplication (within this batch) - ONLY by Student ID
+            // Students without Student ID will all be imported (no deduplication)
             const uniqueStudents = [];
-            const seen = new Set();
+            const seenIds = new Set();
+            const duplicateInfo = [];
+            const studentsWithoutId = [];
 
             studentsToUpload.forEach(s => {
-                // Use phone as primary key, name as fallback
-                const key = s.studentPhone ? s.studentPhone.replace(/[^0-9]/g, '') : s.name.toLowerCase().trim();
-
-                if (!seen.has(key)) {
-                    seen.add(key);
+                // ONLY check Student ID for duplicates - no phone/name checking
+                const studentId = s.studentId ? String(s.studentId).trim() : null;
+                
+                if (studentId) {
+                    // Has Student ID - check for duplicates by ID only
+                    if (!seenIds.has(studentId)) {
+                        seenIds.add(studentId);
+                        uniqueStudents.push(s);
+                    } else {
+                        duplicateInfo.push({ name: s.name, id: studentId });
+                    }
+                } else {
+                    // No Student ID - include all (no deduplication)
+                    studentsWithoutId.push(s.name);
                     uniqueStudents.push(s);
                 }
             });
 
-            if (studentsToUpload.length > uniqueStudents.length) {
-                console.log(`Removed ${studentsToUpload.length - uniqueStudents.length} duplicates from upload.`);
+            if (duplicateInfo.length > 0) {
+                console.warn(`⚠️ Removed ${duplicateInfo.length} duplicate students (by Student ID only):`, duplicateInfo);
             }
+            if (studentsWithoutId.length > 0) {
+                console.log(`ℹ️ ${studentsWithoutId.length} students without Student ID will all be imported (no deduplication)`);
+            }
+            console.log(`📊 Before deduplication: ${studentsToUpload.length}, After: ${uniqueStudents.length}`);
+            
+            // Debug: Check if any of the missing IDs were removed as duplicates
+            const debugIds = ['1477', '2433', '2998'];
+            duplicateInfo.forEach(dup => {
+                if (debugIds.includes(String(dup.id).trim())) {
+                    console.error(`❌ MISSING STUDENT FOUND IN DUPLICATES! ID: ${dup.id}, Name: ${dup.name}`);
+                }
+            });
+            
             studentsToUpload = uniqueStudents;
         }
 

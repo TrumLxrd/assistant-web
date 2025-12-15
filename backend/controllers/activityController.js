@@ -1166,34 +1166,65 @@ const assignNextStudent = async (req, res) => {
             return await sendResponse(nextStudent);
         }
 
-        // PRIORITY 3: Not Done Homework
+        // PRIORITY 3: Not Done Homework (matches monitor priority 2)
+        // Monitor checks: (hw.includes('not done') || hw === 'no')
         console.log(`[Student Assignment] User ${userId} looking for students who haven't done homework`);
-        nextStudent = await tryAssign({
-            homework_status: { $regex: /not done|no|not submitted/i }
-        });
-        if (nextStudent) {
-            console.log(`[Student Assignment] Assigned not done homework student ${nextStudent._id} (${nextStudent.name}) to user ${userId}`);
-            return await sendResponse(nextStudent);
+        // Get all available students and filter to match monitor logic exactly
+        let availableStudents = await CallSessionStudent.find(baseQuery).sort({ createdAt: 1 }).lean();
+        
+        for (const student of availableStudents) {
+            const hw = (student.homework_status || '').toLowerCase().trim();
+            // Match monitor logic exactly: hw.includes('not done') || hw === 'no'
+            // Note: "not completed" contains "not complete" not "not done", so it won't match here
+            if ((hw.includes('not done') || hw === 'no') && !hw.includes('not complete')) {
+                nextStudent = await CallSessionStudent.findOneAndUpdate(
+                    { _id: student._id, ...baseQuery },
+                    { $set: { assigned_to: userId, assigned_at: new Date() } },
+                    { new: true }
+                );
+                if (nextStudent) {
+                    console.log(`[Student Assignment] Assigned not done homework student ${nextStudent._id} (${nextStudent.name}) to user ${userId}`);
+                    return await sendResponse(nextStudent);
+                }
+            }
         }
 
-        // PRIORITY 4: Not Evaluated
+        // PRIORITY 4: Not Evaluated (matches monitor priority 3)
+        // Monitor checks: hw.includes('not evaluated') || hw.includes('pending')
         console.log(`[Student Assignment] User ${userId} looking for students who haven't been evaluated`);
-        nextStudent = await tryAssign({
-            homework_status: { $regex: /not evaluated|pending|not checked/i }
-        });
-        if (nextStudent) {
-            console.log(`[Student Assignment] Assigned not evaluated student ${nextStudent._id} (${nextStudent.name}) to user ${userId}`);
-            return await sendResponse(nextStudent);
+        availableStudents = await CallSessionStudent.find(baseQuery).sort({ createdAt: 1 }).lean();
+        for (const student of availableStudents) {
+            const hw = (student.homework_status || '').toLowerCase().trim();
+            if (hw.includes('not evaluated') || hw.includes('pending')) {
+                nextStudent = await CallSessionStudent.findOneAndUpdate(
+                    { _id: student._id, ...baseQuery },
+                    { $set: { assigned_to: userId, assigned_at: new Date() } },
+                    { new: true }
+                );
+                if (nextStudent) {
+                    console.log(`[Student Assignment] Assigned not evaluated student ${nextStudent._id} (${nextStudent.name}) to user ${userId}`);
+                    return await sendResponse(nextStudent);
+                }
+            }
         }
 
-        // PRIORITY 5: Not Complete / Incomplete
+        // PRIORITY 5: Not Complete / Incomplete (matches monitor priority 4)
+        // Monitor checks: hw.includes('not complete') || hw.includes('incomplete')
         console.log(`[Student Assignment] User ${userId} looking for students with incomplete homework`);
-        nextStudent = await tryAssign({
-            homework_status: { $regex: /not complete|incomplete/i }
-        });
-        if (nextStudent) {
-            console.log(`[Student Assignment] Assigned incomplete homework student ${nextStudent._id} (${nextStudent.name}) to user ${userId}`);
-            return await sendResponse(nextStudent);
+        availableStudents = await CallSessionStudent.find(baseQuery).sort({ createdAt: 1 }).lean();
+        for (const student of availableStudents) {
+            const hw = (student.homework_status || '').toLowerCase().trim();
+            if (hw.includes('not complete') || hw.includes('incomplete')) {
+                nextStudent = await CallSessionStudent.findOneAndUpdate(
+                    { _id: student._id, ...baseQuery },
+                    { $set: { assigned_to: userId, assigned_at: new Date() } },
+                    { new: true }
+                );
+                if (nextStudent) {
+                    console.log(`[Student Assignment] Assigned incomplete homework student ${nextStudent._id} (${nextStudent.name}) to user ${userId}`);
+                    return await sendResponse(nextStudent);
+                }
+            }
         }
 
         // PRIORITY 6: Empty Homework Status
@@ -1278,47 +1309,61 @@ const importCallSessionStudents = async (req, res) => {
         // Update or Insert student records (Upsert) to prevent duplicates and allow updates
         // We check by Phone (if valid) OR Name
         const bulkOps = students.map(student => {
+            // Students are isolated per session - always scope to this session
             let filter = { call_session_id: id };
 
-            // Priority 1: Match by Phone
-            if (student.studentPhone && student.studentPhone.length > 7) {
-                filter.student_phone = student.studentPhone;
-            } else {
-                // Priority 2: Match by Name (case insensitive regex to be safe? No, let's strictly match name for bulkOp performance)
-                // Note: Ideally we should use _id if provided, but import usually implies generic data
-                filter.name = student.name;
+            // If the frontend provided a MongoDB _id (existing student record), use that
+            // Note: student.id or student._id refers to the MongoDB document ID, not the CSV student ID
+            if (student.id || student._id) {
+                filter = { 
+                    _id: student.id || student._id,
+                    call_session_id: id  // Still ensure it's in the correct session
+                };
+            }
+            // ONLY match by Student ID (from CSV) - no phone/name matching
+            // This ensures each session's students are completely independent
+            else if (student.studentId && String(student.studentId).trim()) {
+                filter.student_id = String(student.studentId).trim();
+                // call_session_id already in filter - ensures session isolation
+            }
+            // No Student ID provided - always insert as new (don't try to match)
+            // Force new insert by using a filter that will never match existing records
+            else {
+                // Use a non-existent field to force insert - won't match anything
+                filter = {
+                    call_session_id: id,
+                    student_id: '', // Empty student_id
+                    _forceNewInsert: true // Field that doesn't exist - forces new insert
+                };
             }
 
-            // If the frontend provided an ID (existing student), use that as the most reliable filter!
-            if (student.id || student._id) {
-                filter = { _id: student.id || student._id };
-            }
+            // Build update object - always set these fields
+            const updateOperation = {
+                $set: {
+                    call_session_id: id, // Always ensure correct session
+                    name: student.name,
+                    student_phone: student.studentPhone || '',
+                    parent_phone: student.parentPhone || '',
+                    student_id: student.studentId || '', // Set Student ID (empty if not provided)
+                    center: student.center || '',
+                    exam_mark: student.examMark !== undefined && student.examMark !== null ? student.examMark : null,
+                    attendance_status: student.attendanceStatus || '',
+                    homework_status: student.homeworkStatus || '',
+                    imported_at: importTimestamp // Track when imported
+                },
+                $setOnInsert: {
+                    filter_status: '' // Only set filter_status on new inserts
+                },
+                $currentDate: {
+                    updatedAt: true // Always update timestamp
+                }
+            };
 
             return {
                 updateOne: {
                     filter: filter,
-                    update: {
-                        $set: {
-                            call_session_id: id, // Ensure session ID set
-                            name: student.name,
-                            student_phone: student.studentPhone || '',
-                            parent_phone: student.parentPhone || '',
-                            student_id: student.studentId || '',
-                            center: student.center || '',
-                            exam_mark: student.examMark !== undefined && student.examMark !== null ? student.examMark : null,
-                            attendance_status: student.attendanceStatus || '',
-                            homework_status: student.homeworkStatus || '',
-                            imported_at: importTimestamp // Use consistent import timestamp
-                        },
-                        $setOnInsert: {
-                            created_at: new Date(),
-                            filter_status: '' // Only set on insert
-                        },
-                        $currentDate: {
-                            updatedAt: true // Set updatedAt to current date for both inserts and updates
-                        }
-                    },
-                    upsert: true
+                    update: updateOperation,
+                    upsert: true // Insert if no match found
                 }
             };
         });
@@ -1333,8 +1378,12 @@ const importCallSessionStudents = async (req, res) => {
 
         if (bulkOps.length > 0) {
             const result = await CallSessionStudent.bulkWrite(bulkOps);
+            // Count both new inserts and updates as "processed" for this import
             importedCount = result.upsertedCount || 0;
             updatedCount = result.modifiedCount || 0;
+            const totalProcessed = importedCount + updatedCount;
+            
+            console.log(`Import summary: ${importedCount} inserted, ${updatedCount} updated, ${totalProcessed} total processed out of ${students.length} students in import`);
 
             // Find all students that were affected by this import (updated/created since importTimestamp)
             // This includes both newly inserted and updated existing students
@@ -1354,20 +1403,26 @@ const importCallSessionStudents = async (req, res) => {
             });
         }
 
-        // Verify that students were actually updated
+        // Verify that students were actually imported/updated
         const recentlyUpdated = await CallSessionStudent.find({
             call_session_id: id,
-            updatedAt: { $gte: importTimestamp }
-        }).limit(3);
+            $or: [
+                { imported_at: { $gte: importTimestamp } },
+                { updatedAt: { $gte: importTimestamp } }
+            ]
+        }).limit(5);
 
-        console.log('Students found with updatedAt >= importTimestamp after import:', recentlyUpdated.length);
+        console.log('Students found with imported_at or updatedAt >= importTimestamp after import:', recentlyUpdated.length);
         if (recentlyUpdated.length > 0) {
-            console.log('Sample updated student:', {
-                name: recentlyUpdated[0].name,
-                updatedAt: recentlyUpdated[0].updatedAt,
-                imported_at: recentlyUpdated[0].imported_at
+            console.log('Sample imported/updated students:');
+            recentlyUpdated.forEach((s, idx) => {
+                console.log(`  ${idx + 1}. ${s.name} (ID: ${s.student_id || 'N/A'}) - imported_at: ${s.imported_at}, updatedAt: ${s.updatedAt}`);
             });
         }
+        
+        // Count total students in session after import
+        const totalStudentsInSession = await CallSessionStudent.countDocuments({ call_session_id: id });
+        console.log(`Total students in session after import: ${totalStudentsInSession}`);
 
         await logAuditAction(req.user.id, 'IMPORT_CALL_SESSION_STUDENTS', {
             session_id: id,
@@ -1382,13 +1437,18 @@ const importCallSessionStudents = async (req, res) => {
 
         console.log('Sending response with backupId:', backupId);
 
+        // Get final count of students in session
+        const finalStudentCount = await CallSessionStudent.countDocuments({ call_session_id: id });
+        
         res.status(200).json({
             success: true,
-            message: `${students.length} students processed (merged/imported) successfully`,
+            message: `${students.length} students processed (${importedCount} inserted, ${updatedCount} updated). Total students in session: ${finalStudentCount}`,
             data: {
-                total_processed: students.length,
+                total_in_import: students.length,
                 imported: importedCount,
                 updated: updatedCount,
+                total_processed: importedCount + updatedCount,
+                total_students_in_session: finalStudentCount,
                 undo_token: undoToken,
                 undo_expires_in: 10 * 60 * 1000, // 10 minutes in milliseconds
                 backupId: backupId  // Include backup ID for undo
