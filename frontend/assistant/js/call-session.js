@@ -48,7 +48,7 @@ const nextStudentBtn = document.getElementById('next-student');
 
 // Round two mode buttons removed - round two is now a separate session
 
-const filterButtons = document.querySelectorAll('.filter-btn');
+let filterButtons = document.querySelectorAll('.filter-btn');
 
 // Data
 let sessionData = null;
@@ -211,7 +211,7 @@ async function init() {
     // Try to restore state first
     const restored = restoreSessionState();
 
-    // Always load session data to get latest info
+    // Always load session data to get latest info (this sets up filter buttons)
     await loadSessionData();
 
     if (restored && students.length > 0 && students[0]) {
@@ -293,6 +293,23 @@ async function loadSessionData() {
             if (sessionData.stats) {
                 document.getElementById('remaining-count').textContent = sessionData.stats.remaining;
                 document.getElementById('completed-count').textContent = sessionData.stats.completed;
+            }
+
+            // Show appropriate filters based on session type
+            const sessionType = sessionData.session_type || 'normal';
+            const normalFilters = document.getElementById('normal-filters');
+            const marketingFilters = document.getElementById('marketing-filters');
+            
+            if (sessionType === 'marketing') {
+                normalFilters.style.display = 'none';
+                marketingFilters.style.display = 'flex';
+                // Update filterButtons reference to marketing filters
+                filterButtons = document.querySelectorAll('#marketing-filters .filter-btn');
+            } else {
+                normalFilters.style.display = 'flex';
+                marketingFilters.style.display = 'none';
+                // Update filterButtons reference to normal filters
+                filterButtons = document.querySelectorAll('#normal-filters .filter-btn');
             }
         } else {
             showToast('Failed to load session data', 'error');
@@ -546,7 +563,12 @@ function displayStudent(student) {
     if (prevStudentBtn) prevStudentBtn.disabled = true;
     if (nextStudentBtn) nextStudentBtn.disabled = false; // "Next" fetches new one
 
-    // Update filter button states
+    // Update filter button states (refresh filterButtons reference in case it changed)
+    const sessionType = sessionData?.session_type || 'normal';
+    filterButtons = sessionType === 'marketing' 
+        ? document.querySelectorAll('#marketing-filters .filter-btn')
+        : document.querySelectorAll('#normal-filters .filter-btn');
+    
     filterButtons.forEach(btn => {
         if (btn.dataset.filter === student.filterStatus) {
             btn.classList.add('active');
@@ -653,7 +675,12 @@ function setupEventListeners() {
         });
     }
 
-    // Filters
+    // Filters - refresh filterButtons reference to ensure we have the correct buttons
+    const sessionType = sessionData?.session_type || 'normal';
+    filterButtons = sessionType === 'marketing' 
+        ? document.querySelectorAll('#marketing-filters .filter-btn')
+        : document.querySelectorAll('#normal-filters .filter-btn');
+    
     filterButtons.forEach(btn => {
         btn.addEventListener('click', async () => {
             if (!isOnline) {

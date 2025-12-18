@@ -41,7 +41,7 @@ const callSessionStudentSchema = new mongoose.Schema({
     },
     filter_status: {
         type: String,
-        enum: ['', 'wrong-number', 'no-answer', 'online-makeup', 'left-teacher', 'other-makeup', 'tired', 'present'],
+        enum: ['', 'wrong-number', 'no-answer', 'online-makeup', 'left-teacher', 'other-makeup', 'tired', 'present', 'deal-done', 'thinking', 'rejected', 'asking-whatsapp'],
         default: ''
     },
     comments: [{

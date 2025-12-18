@@ -30,7 +30,11 @@ function formatFilterStatus(status) {
         'online-makeup': 'Online Makeup',
         'left-teacher': 'Left Teacher',
         'other-makeup': 'Other Makeup',
-        'tired': 'Tired'
+        'tired': 'Tired',
+        'deal-done': 'Deal is done',
+        'thinking': 'Thinking',
+        'rejected': 'Rejected',
+        'asking-whatsapp': 'Asking for whatsapp'
     };
 
     return statusMap[status] || status;
@@ -235,6 +239,7 @@ async function loadSessionData(id) {
             document.getElementById('session-name').value = session.name;
             document.getElementById('session-date').value = session.date;
             document.getElementById('session-time').value = session.start_time;
+            document.getElementById('session-type').value = session.session_type || 'normal';
             document.getElementById('session-assistant').value = session.assistant_id || '';
         }
     } catch (error) {
@@ -438,6 +443,7 @@ document.getElementById('session-form').addEventListener('submit', async (e) => 
         const name = document.getElementById('session-name').value;
         const date = document.getElementById('session-date').value;
         const time = document.getElementById('session-time').value;
+        const sessionType = document.getElementById('session-type').value;
         const assistantId = document.getElementById('session-assistant').value || null;
 
         // 1. Create/Update Session
@@ -445,6 +451,7 @@ document.getElementById('session-form').addEventListener('submit', async (e) => 
             name,
             date,
             start_time: time,
+            session_type: sessionType,
             assistant_id: assistantId
         };
 

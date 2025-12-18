@@ -227,7 +227,7 @@ const deleteWhatsAppSchedule = async (req, res) => {
  */
 const createCallSession = async (req, res) => {
     try {
-        const { name, date, start_time } = req.body;
+        const { name, date, start_time, session_type } = req.body;
 
         if (!name || !date || !start_time) {
             return res.status(400).json({
@@ -240,7 +240,8 @@ const createCallSession = async (req, res) => {
             name,
             date: parseAsEgyptTime(date),
             start_time,
-            status: 'pending'
+            status: 'pending',
+            session_type: session_type || 'normal'
         });
 
         await newSession.save();
@@ -417,6 +418,7 @@ const getCallSessions = async (req, res) => {
                 date: dateMoment.format('YYYY-MM-DD'),
                 start_time: session.start_time,
                 status: session.status,
+                session_type: session.session_type || 'normal',
                 assistant_id: session.assistant_id?._id || null,
                 assistant_name: session.assistant_id?.name || null,
                 assistants: session.assistants || [],
@@ -489,6 +491,7 @@ const getCallSessionById = async (req, res) => {
             date: dateMoment.format('YYYY-MM-DD'),
             start_time: session.start_time,
             status: session.status,
+            session_type: session.session_type || 'normal',
             assistant_id: session.assistant_id?._id || null,
             assistant_name: session.assistant_id?.name || null,
             assistants: assistants.map(a => ({ id: a._id, name: a.name || 'Unknown' })),
@@ -523,7 +526,7 @@ const getCallSessionById = async (req, res) => {
 const updateCallSession = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, date, start_time, status, assistant_id, end_time } = req.body;
+        const { name, date, start_time, status, assistant_id, end_time, session_type } = req.body;
 
         const updateData = {};
         if (name) updateData.name = name;
@@ -531,6 +534,7 @@ const updateCallSession = async (req, res) => {
         if (start_time) updateData.start_time = start_time;
         if (status) updateData.status = status;
         if (assistant_id !== undefined) updateData.assistant_id = assistant_id;
+        if (session_type) updateData.session_type = session_type;
         if (end_time !== undefined) {
             // If end_time is provided, parse it as a datetime
             if (end_time) {

@@ -157,7 +157,8 @@
 
                     <!-- Filters & Comment Section -->
                     <div class="filters-section">
-                        <div class="filter-buttons">
+                        <!-- Normal (Attendance) Filters -->
+                        <div class="filter-buttons" id="normal-filters" style="display: none;">
                             <button class="filter-btn" data-filter="present">حاضر</button>
                             <button class="filter-btn" data-filter="wrong-number">رقم غلط</button>
                             <button class="filter-btn" data-filter="no-answer">مفيش رد</button>
@@ -165,6 +166,13 @@
                             <button class="filter-btn" data-filter="left-teacher">ساب المستر</button>
                             <button class="filter-btn" data-filter="other-makeup">هيعوض في معاد اخر</button>
                             <button class="filter-btn" data-filter="tired">تعبان</button>
+                        </div>
+                        <!-- Marketing Filters -->
+                        <div class="filter-buttons" id="marketing-filters" style="display: none;">
+                            <button class="filter-btn" data-filter="deal-done">Deal is done</button>
+                            <button class="filter-btn" data-filter="thinking">Thinking</button>
+                            <button class="filter-btn" data-filter="rejected">Rejected</button>
+                            <button class="filter-btn" data-filter="asking-whatsapp">Asking for whatsapp</button>
                         </div>
                         <button class="btn btn-secondary btn-block btn-comment" id="add-comment-btn">
                             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"

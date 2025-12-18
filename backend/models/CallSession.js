@@ -25,6 +25,11 @@ const callSessionSchema = new mongoose.Schema({
         enum: ['pending', 'active', 'completed'],
         default: 'pending'
     },
+    session_type: {
+        type: String,
+        enum: ['normal', 'marketing'],
+        default: 'normal'
+    },
     assistant_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
