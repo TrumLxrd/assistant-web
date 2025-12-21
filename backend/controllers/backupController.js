@@ -3,9 +3,15 @@ const Center = require('../models/Center');
 const Session = require('../models/Session');
 const Attendance = require('../models/Attendance');
 const AuditLog = require('../models/AuditLog');
+const ActivityLog = require('../models/ActivityLog');
+const CallSession = require('../models/CallSession');
+const CallSessionStudent = require('../models/CallSessionStudent');
+const WhatsAppSchedule = require('../models/WhatsAppSchedule');
+const ErrorLog = require('../models/ErrorLog');
 const path = require('path');
 const fs = require('fs').promises;
 const { logAuditAction } = require('../utils/auditLogger');
+const { logError } = require('../utils/errorLogger');
 const DeletedItem = require('../models/DeletedItem');
 const { restoreFromBackup, permanentlyDeleteBackup } = require('../utils/backupHelper');
 
@@ -73,8 +79,13 @@ const listBackups = async (req, res) => {
  * POST /api/admin/backups
  */
 const createBackup = async (req, res) => {
+    let collectionsToBackup = null;
+    let type = 'full';
     try {
-        const { type = 'full', collections = null, description = '' } = req.body;
+        const requestBody = req.body;
+        type = requestBody.type || 'full';
+        const collections = requestBody.collections || null;
+        const description = requestBody.description || '';
 
         const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '').replace(/-/g, '').replace('T', '_');
         const backupFilename = `backup_${type}_${timestamp}.json`;
@@ -88,8 +99,8 @@ const createBackup = async (req, res) => {
         const backupData = {
             metadata: {
                 created_at: new Date().toISOString(),
-                type,
-                description,
+                type: type,
+                description: description,
                 created_by: {
                     id: req.user.id,
                     name: req.user.name,
@@ -101,7 +112,7 @@ const createBackup = async (req, res) => {
         };
 
         // Determine which collections to backup
-        let collectionsToBackup = collections || ['users', 'centers', 'sessions', 'attendance', 'auditlogs'];
+        collectionsToBackup = collections || ['users', 'centers', 'sessions', 'attendance', 'auditlogs', 'activitylogs', 'callsessions', 'callsessionstudents', 'whatsappschedules'];
 
         // Export each collection
         for (const collectionName of collectionsToBackup) {
@@ -124,6 +135,21 @@ const createBackup = async (req, res) => {
                     case 'auditlogs':
                         data = await AuditLog.find().lean();
                         break;
+                    case 'activitylogs':
+                        data = await ActivityLog.find().lean();
+                        break;
+                    case 'callsessions':
+                        data = await CallSession.find().lean();
+                        break;
+                    case 'callsessionstudents':
+                        data = await CallSessionStudent.find().lean();
+                        break;
+                    case 'whatsappschedules':
+                        data = await WhatsAppSchedule.find().lean();
+                        break;
+                    case 'errorlogs':
+                        data = await ErrorLog.find().lean();
+                        break;
                     default:
                         console.warn(`Unknown collection: ${collectionName}`);
                         continue;
@@ -134,7 +160,7 @@ const createBackup = async (req, res) => {
                     records: data
                 };
             } catch (collectionError) {
-                console.warn(`Error backing up collection ${collectionName}:`, collectionError.message);
+                console.error(`Error backing up collection ${collectionName}:`, collectionError);
                 backupData.data[collectionName] = {
                     error: collectionError.message,
                     count: 0,
@@ -169,9 +195,15 @@ const createBackup = async (req, res) => {
         });
     } catch (error) {
         console.error('Create backup error:', error);
+        await logError(error, {
+            action: 'createBackup',
+            type,
+            collections: collectionsToBackup
+        }, req);
         res.status(500).json({
             success: false,
-            message: 'Error creating backup'
+            message: 'Error creating backup',
+            error: error.message
         });
     }
 };
