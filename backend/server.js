@@ -88,6 +88,60 @@ app.use('/api/admin/backups', backupRoutes);
 app.use('/api/log', logRoutes);
 app.use('/api/activities', activityRoutes);
 
+/* ---------- Cron endpoint for WhatsApp scheduler (Vercel Cron) ---------- */
+// This endpoint is called by Vercel Cron Jobs daily at 1 AM UTC
+// Note: Vercel Cron doesn't send auth headers, but the path is protected by Vercel's infrastructure
+app.get('/api/cron/whatsapp-generate', async (req, res) => {
+    try {
+        // Ensure database is connected
+        if (mongoose.connection.readyState !== 1) {
+            console.log('Database not connected, attempting connection...');
+            await connectDB();
+            // Wait a bit for connection to establish
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        // Optional: Add basic security check via query parameter or header
+        // If CRON_SECRET is set in environment variables, require it as a query param
+        const cronSecret = process.env.CRON_SECRET;
+        if (cronSecret) {
+            const providedSecret = req.query.secret || req.headers['x-cron-secret'];
+            if (providedSecret !== cronSecret) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized - Invalid cron secret'
+                });
+            }
+        }
+
+        // Import and run the generator
+        const { generateDailyWhatsAppRecords } = require('./utils/whatsappScheduler');
+        
+        console.log('🕐 Running WhatsApp scheduler cron job via API endpoint...');
+        const result = await generateDailyWhatsAppRecords();
+        
+        if (result) {
+            res.json({
+                success: true,
+                message: 'WhatsApp records generated successfully',
+                timestamp: new Date().toISOString()
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                message: 'Failed to generate WhatsApp records'
+            });
+        }
+    } catch (error) {
+        console.error('Error in WhatsApp cron endpoint:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error generating WhatsApp records',
+            error: error.message
+        });
+    }
+});
+
 /* ---------- Health check ---------- */
 app.get('/api/health', (req, res) => {
     try {

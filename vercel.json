@@ -1,5 +1,11 @@
 {
     "version": 2,
+    "crons": [
+        {
+            "path": "/api/cron/whatsapp-generate",
+            "schedule": "0 1 * * *"
+        }
+    ],
     "builds": [
         {
             "src": "backend/server.js",

@@ -4,23 +4,23 @@ const { getCurrentEgyptTime } = require('./timezone');
 const { logError } = require('./errorLogger');
 
 /**
- * Generate WhatsApp records for all days of the week
+ * Generate WhatsApp records for today only
  * This function is called by the cron job daily
- * It generates records for the current week (today + next 6 days)
+ * It generates records for today's date based on the day of week schedule
  */
 const generateDailyWhatsAppRecords = async () => {
     try {
         const now = getCurrentEgyptTime();
         const today = moment.tz(now, 'Africa/Cairo').startOf('day');
 
-        // Generate records for today only
+        // Generate records for today only (day by day)
         await generateWhatsAppRecordsForDate(today.toDate());
 
         console.log('✅ WhatsApp records generated for today');
         return true;
     } catch (error) {
         console.error('❌ Error generating WhatsApp records:', error);
-        await logError(null, 'WHATSAPP_SCHEDULER_CRON', error);
+        await logError(error, { action: 'WHATSAPP_SCHEDULER_CRON' });
         return false;
     }
 };
