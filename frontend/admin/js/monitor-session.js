@@ -109,6 +109,22 @@ async function loadSessionDetails() {
                 roundTwoBtn.style.opacity = '1';
                 roundTwoBtn.style.cursor = 'pointer';
             }
+
+            // Hide/show attendance column header based on session type
+            const attendanceHeader = document.getElementById('attendance-header-column');
+            if (attendanceHeader && currentSessionData.session_type === 'marketing') {
+                attendanceHeader.style.display = 'none';
+            } else if (attendanceHeader) {
+                attendanceHeader.style.display = '';
+            }
+
+            // Hide/show homework column header based on session type
+            const homeworkHeader = document.getElementById('homework-header-column');
+            if (homeworkHeader && currentSessionData.session_type === 'marketing') {
+                homeworkHeader.style.display = 'none';
+            } else if (homeworkHeader) {
+                homeworkHeader.style.display = '';
+            }
         }
     } catch (error) {
         console.error('Error loading session:', error);
@@ -119,7 +135,10 @@ async function loadSessionDetails() {
 // Load Students
 async function loadStudents() {
     const tbody = document.getElementById('students-table-body');
-    const colspan = roundTwoEnabled ? 16 : 14;
+    const sessionType = currentSessionData?.session_type || 'normal';
+    const isMarketing = sessionType === 'marketing';
+    const baseColspan = isMarketing ? 12 : 14;
+    const colspan = roundTwoEnabled ? baseColspan + 2 : baseColspan;
     tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center">Loading students...</td></tr>`;
 
     try {
@@ -141,8 +160,13 @@ async function loadStudents() {
 // Render Table
 function renderStudentsTable(students) {
     const tbody = document.getElementById('students-table-body');
-
-    const colspan = roundTwoEnabled ? 16 : 14;
+    const sessionType = currentSessionData?.session_type || 'normal';
+    const isMarketing = sessionType === 'marketing';
+    
+    // Adjust colspan: subtract 2 if marketing (no attendance and homework columns), then add round two columns if enabled
+    const baseColspan = isMarketing ? 12 : 14;
+    const colspan = roundTwoEnabled ? baseColspan + 2 : baseColspan;
+    
     if (students.length === 0) {
         tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center">No students found. Import or add some!</td></tr>`;
         return;
@@ -158,6 +182,18 @@ function renderStudentsTable(students) {
             ? `<span style="color: var(--accent-orange); font-weight: 500;">${s.assignedTo} (Active)</span>`
             : (s.lastCalledBy || '-');
 
+        // Build attendance cell only for non-marketing sessions
+        const attendanceCell = isMarketing ? '' : `
+                <td>
+                    ${s.attendanceStatus ? `<span style="color: ${s.attendanceStatus.toLowerCase().includes('absent') ? '#ef4444' : '#10b981'}; font-weight: 600;">${s.attendanceStatus}</span>` : '-'}
+                </td>`;
+
+        // Build homework cell only for non-marketing sessions
+        const homeworkCell = isMarketing ? '' : `
+                <td>
+                    ${s.homeworkStatus ? `<span style="color: ${getHomeworkColor(s.homeworkStatus)}; font-weight: 600;">${s.homeworkStatus}</span>` : '-'}
+                </td>`;
+
         return `
             <tr data-student-id="${s.id || s._id}">
                 <td>${s.studentId || '-'}</td>
@@ -166,12 +202,8 @@ function renderStudentsTable(students) {
                 <td>${s.parentPhone || '-'}</td>
                 <td>${s.center || '-'}</td>
                 <td>${s.examMark !== undefined && s.examMark !== null && s.examMark !== '' ? s.examMark : '-'}</td>
-                <td>
-                    ${s.attendanceStatus ? `<span style="color: ${s.attendanceStatus.toLowerCase().includes('absent') ? '#ef4444' : '#10b981'}; font-weight: 600;">${s.attendanceStatus}</span>` : '-'}
-                </td>
-                <td>
-                    ${s.homeworkStatus ? `<span style="color: ${getHomeworkColor(s.homeworkStatus)}; font-weight: 600;">${s.homeworkStatus}</span>` : '-'}
-                </td>
+                ${attendanceCell}
+                ${homeworkCell}
                 <td>
                     <span class="badge" style="background: ${getFilterStatusColor(s.filterStatus).bg}; color: ${getFilterStatusColor(s.filterStatus).text};">
                         ${formatFilterStatus(s.filterStatus)}
@@ -482,7 +514,8 @@ async function saveStudentsList(studentsList) {
                 examMark: student.examMark !== undefined && student.examMark !== null && student.examMark !== '' ? student.examMark : '',
                 attendanceStatus: student.attendanceStatus || '',
                 homeworkStatus: student.homeworkStatus || '',
-                filterStatus: student.filterStatus || ''
+                filterStatus: student.filterStatus || '',
+                adminComment: student.adminComment || ''
             };
 
             // Include MongoDB _id or id if it exists (for existing students)
@@ -682,7 +715,10 @@ function showRoundTwoColumns() {
     const tbody = document.getElementById('students-table-body');
     const loadingRow = tbody.querySelector('tr td[colspan]');
     if (loadingRow) {
-        loadingRow.setAttribute('colspan', '16');
+        const sessionType = currentSessionData?.session_type || 'normal';
+        const isMarketing = sessionType === 'marketing';
+        const baseColspan = isMarketing ? 12 : 14;
+        loadingRow.setAttribute('colspan', String(baseColspan + 2));
     }
 }
 
@@ -694,7 +730,10 @@ function hideRoundTwoColumns() {
     const tbody = document.getElementById('students-table-body');
     const loadingRow = tbody.querySelector('tr td[colspan]');
     if (loadingRow) {
-        loadingRow.setAttribute('colspan', '14');
+        const sessionType = currentSessionData?.session_type || 'normal';
+        const isMarketing = sessionType === 'marketing';
+        const baseColspan = isMarketing ? 12 : 14;
+        loadingRow.setAttribute('colspan', String(baseColspan));
     }
 }
 

@@ -1096,6 +1096,7 @@ const assignNextStudent = async (req, res) => {
                 homeworkStatus: student.homework_status || '',
                 filterStatus: student.filter_status,
                 comments: student.comments,
+                adminComment: student.admin_comment || '',
                 howMany: student.how_many,
                 totalTest: student.total_test
             };
@@ -1413,6 +1414,7 @@ const importCallSessionStudents = async (req, res) => {
                     exam_mark: student.examMark !== undefined && student.examMark !== null && student.examMark !== '' ? student.examMark : null,
                     attendance_status: student.attendanceStatus || '',
                     homework_status: student.homeworkStatus || '',
+                    admin_comment: student.adminComment !== undefined && student.adminComment !== null ? String(student.adminComment) : '',
                     imported_at: importTimestamp // Track when imported
                 },
                 $setOnInsert: {},
@@ -1591,6 +1593,7 @@ const getCallSessionStudents = async (req, res) => {
             homeworkStatus: s.homework_status || '',
             filterStatus: s.filter_status,
             comments: s.comments,
+            adminComment: s.admin_comment || '',
             howMany: s.how_many,
             totalTest: s.total_test,
             lastCalledBy: s.last_called_by?.name || null,

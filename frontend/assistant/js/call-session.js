@@ -262,6 +262,7 @@ async function loadPreviousStudent() {
                 attendanceStatus: student.attendanceStatus || student.attendance_status || '',
                 filterStatus: student.filter_status,
                 comments: student.comments || [],
+                adminComment: student.adminComment || '',
                 howMany: student.how_many,
                 totalTest: student.total_test
             };
@@ -504,11 +505,15 @@ function displayStudent(student) {
         examMarkGroup.style.display = 'none';
     }
 
-    // Attendance Status
+    // Attendance Status (hide for marketing sessions)
     const attendanceStatusEl = document.getElementById('attendance-status');
     const attendanceStatusGroup = document.getElementById('attendance-status-group');
+    const sessionType = sessionData?.session_type || 'normal';
 
-    if (student.attendanceStatus) {
+    // Hide attendance status for marketing sessions
+    if (sessionType === 'marketing') {
+        attendanceStatusGroup.style.display = 'none';
+    } else if (student.attendanceStatus) {
         attendanceStatusEl.value = student.attendanceStatus;
         attendanceStatusGroup.style.display = 'block';
         hasOptionalInfo = true;
@@ -525,11 +530,15 @@ function displayStudent(student) {
         attendanceStatusGroup.style.display = 'none';
     }
 
-    // Homework Status
+    // Homework Status (hide for marketing sessions)
     const homeworkStatusEl = document.getElementById('homework-status');
     const homeworkStatusGroup = document.getElementById('homework-status-group');
+    // sessionType already declared above
 
-    if (student.homeworkStatus) {
+    // Hide homework status for marketing sessions
+    if (sessionType === 'marketing') {
+        homeworkStatusGroup.style.display = 'none';
+    } else if (student.homeworkStatus) {
         homeworkStatusEl.value = student.homeworkStatus;
         homeworkStatusGroup.style.display = 'block';
         hasOptionalInfo = true;
@@ -552,7 +561,19 @@ function displayStudent(student) {
     // Show optional section only if at least one field has data
     optionalSection.style.display = hasOptionalInfo ? 'block' : 'none';
 
-    // Load comments
+    // Display admin comment (only for marketing sessions)
+    const adminCommentSection = document.getElementById('admin-comment-section');
+    const adminCommentText = document.getElementById('admin-comment-text');
+    // sessionType already declared above
+    
+    if (sessionType === 'marketing' && student.adminComment && student.adminComment.trim()) {
+        adminCommentText.textContent = student.adminComment;
+        adminCommentSection.style.display = 'block';
+    } else {
+        adminCommentSection.style.display = 'none';
+    }
+
+    // Load comments (assistant's own comments)
     loadComments(student.comments);
 
     // Update checkboxes
@@ -564,7 +585,7 @@ function displayStudent(student) {
     if (nextStudentBtn) nextStudentBtn.disabled = false; // "Next" fetches new one
 
     // Update filter button states (refresh filterButtons reference in case it changed)
-    const sessionType = sessionData?.session_type || 'normal';
+    // sessionType already declared above
     filterButtons = sessionType === 'marketing' 
         ? document.querySelectorAll('#marketing-filters .filter-btn')
         : document.querySelectorAll('#normal-filters .filter-btn');

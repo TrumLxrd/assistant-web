@@ -329,6 +329,10 @@ function parseImportFile(file) {
                         else if (['homeworkstatus', 'homework', 'hw', 'hwstatus', 'assignment', 'assignmentstatus'].includes(cleanKey)) {
                             newRow.homeworkStatus = val;
                         }
+                        // Admin Comment (com column)
+                        else if (['com', 'comment', 'admincomment', 'admincomment', 'note', 'notes'].includes(cleanKey)) {
+                            newRow.adminComment = val;
+                        }
                     });
 
                     // Validation: Must have at least a name

@@ -86,6 +86,10 @@ const callSessionStudentSchema = new mongoose.Schema({
     imported_at: {
         type: Date,
         default: null
+    },
+    admin_comment: {
+        type: String,
+        default: ''
     }
 }, {
     timestamps: true
