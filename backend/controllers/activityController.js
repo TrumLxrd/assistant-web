@@ -1044,6 +1044,7 @@ const assignNextStudent = async (req, res) => {
         const { id } = req.params;
         const userId = req.user.id;
         const LOCK_TIMEOUT_MINUTES = 60; // Increased from 15 to 60 minutes to prevent reassignment
+        const DOUBLE_ASSIGN_CHECK_MINUTES = 1; // Check for recent assignments to prevent double-assignment
 
         const session = await CallSession.findById(id);
         if (!session) {
@@ -1134,9 +1135,13 @@ const assignNextStudent = async (req, res) => {
             ]
         };
 
+        // Additional check: Prevent double-assignment in last 5 minutes
+        // Check if this student was recently assigned to another assistant
+        const doubleAssignThreshold = new Date(Date.now() - DOUBLE_ASSIGN_CHECK_MINUTES * 60000);
+
         // Helper to try assigning a student with specific criteria
         const tryAssign = async (criteria) => {
-            return await CallSessionStudent.findOneAndUpdate(
+            const student = await CallSessionStudent.findOneAndUpdate(
                 { ...baseQuery, ...criteria },
                 {
                     $set: {
@@ -1146,6 +1151,37 @@ const assignNextStudent = async (req, res) => {
                 },
                 { new: true, sort: { createdAt: 1 } } // Sort by creation time for consistent assignment order
             );
+
+            // Double-check: Make sure no other assistant got this student in the last 5 minutes
+            if (student) {
+                const recentAssignment = await CallSessionStudent.findOne({
+                    _id: student._id,
+                    assigned_to: { $ne: userId },
+                    assigned_at: { $gte: doubleAssignThreshold }
+                });
+
+                if (recentAssignment) {
+                    console.warn(`[Double-Assign Prevention] Student ${student._id} (${student.name}) was recently assigned to assistant ${recentAssignment.assigned_to} at ${recentAssignment.assigned_at}. Current assistant ${userId} tried to assign at ${student.assigned_at}. Reverting assignment.`);
+
+                    // Revert the assignment
+                    await CallSessionStudent.findOneAndUpdate(
+                        { _id: student._id },
+                        {
+                            $set: {
+                                assigned_to: recentAssignment.assigned_to,
+                                assigned_at: recentAssignment.assigned_at
+                            }
+                        }
+                    );
+
+                    // Try to get another student instead
+                    return null;
+                } else {
+                    console.log(`[Double-Assign Prevention] ✓ Student ${student._id} (${student.name}) safely assigned to assistant ${userId}`);
+                }
+            }
+
+            return student;
         };
 
         let nextStudent = null;
@@ -2858,6 +2894,7 @@ const assignNextRoundTwoStudent = async (req, res) => {
         const { id } = req.params;
         const userId = req.user.id;
         const LOCK_TIMEOUT_MINUTES = 60; // Increased from 15 to 60 minutes
+        const DOUBLE_ASSIGN_CHECK_MINUTES = 5; // Check for recent assignments to prevent double-assignment
 
         const session = await CallSession.findById(id);
         if (!session) {
@@ -2917,11 +2954,56 @@ const assignNextRoundTwoStudent = async (req, res) => {
             });
         }
 
-        // 3. Assign the student for round two
-        console.log(`[Round Two Assignment] Assigned round two student ${availableStudent._id} (${availableStudent.name}) to user ${userId}`);
-        availableStudent.round_two_assigned_to = userId;
-        availableStudent.round_two_assigned_at = new Date();
-        await availableStudent.save();
+        // 3. Double-check: Make sure no other assistant got this student for round two in the last 5 minutes
+        const doubleAssignThreshold = new Date(Date.now() - DOUBLE_ASSIGN_CHECK_MINUTES * 60000);
+        const recentRoundTwoAssignment = await CallSessionStudent.findOne({
+            _id: availableStudent._id,
+            round_two_assigned_to: { $ne: null, $ne: userId },
+            round_two_assigned_at: { $gte: doubleAssignThreshold }
+        });
+
+        if (recentRoundTwoAssignment) {
+            console.warn(`[Round Two Double-Assign Prevention] Student ${availableStudent._id} (${availableStudent.name}) was recently assigned for round two to assistant ${recentRoundTwoAssignment.round_two_assigned_to} at ${recentRoundTwoAssignment.round_two_assigned_at}. Current assistant ${userId} tried to assign. Skipping and trying another student.`);
+
+            // Try to find another student instead
+            const nextAvailableStudent = await CallSessionStudent.findOne({
+                call_session_id: id,
+                filter_status: 'no-answer',
+                round_two_assigned_to: null,
+                _id: { $ne: availableStudent._id } // Exclude the one we just checked
+            }).sort({ createdAt: 1 });
+
+            if (nextAvailableStudent) {
+                console.log(`[Round Two Assignment] Assigned alternative round two student ${nextAvailableStudent._id} (${nextAvailableStudent.name}) to user ${userId}`);
+                nextAvailableStudent.round_two_assigned_to = userId;
+                nextAvailableStudent.round_two_assigned_at = new Date();
+                await nextAvailableStudent.save();
+
+                await logAuditAction(userId, 'ASSIGN_ROUND_TWO_STUDENT', {
+                    session_id: id,
+                    student_id: nextAvailableStudent._id.toString()
+                });
+
+                availableStudent = nextAvailableStudent;
+            } else {
+                console.log(`[Round Two Assignment] No alternative round two students available for user ${userId} in session ${id}`);
+                return res.status(404).json({
+                    success: false,
+                    message: 'No round two students available for assignment'
+                });
+            }
+        } else {
+            // 3. Assign the student for round two
+            console.log(`[Round Two Assignment] ✓ Assigned round two student ${availableStudent._id} (${availableStudent.name}) to user ${userId}`);
+            availableStudent.round_two_assigned_to = userId;
+            availableStudent.round_two_assigned_at = new Date();
+            await availableStudent.save();
+
+            await logAuditAction(userId, 'ASSIGN_ROUND_TWO_STUDENT', {
+                session_id: id,
+                student_id: availableStudent._id.toString()
+            });
+        }
 
         await logAuditAction(userId, 'ASSIGN_ROUND_TWO_STUDENT', {
             session_id: id,
