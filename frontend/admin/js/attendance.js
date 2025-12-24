@@ -1,7 +1,7 @@
 // Attendance Reports JavaScript
 
 // Hide WhatsApp schedule elements from attendance page
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // Hide any WhatsApp schedule related elements that might be loaded
     const hideWhatsAppElements = () => {
         const selectors = [
@@ -61,15 +61,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Prevent WhatsApp schedule functionality from loading
     if (typeof loadWhatsAppSchedules === 'function') {
-        loadWhatsAppSchedules = function() { /* Disabled on attendance page */ };
+        loadWhatsAppSchedules = function () { /* Disabled on attendance page */ };
     }
     if (typeof displayWhatsAppSchedules === 'function') {
-        displayWhatsAppSchedules = function() { /* Disabled on attendance page */ };
+        displayWhatsAppSchedules = function () { /* Disabled on attendance page */ };
     }
 
     // Override any potential global WhatsApp functions
-    window.loadWhatsAppSchedules = function() { /* Disabled */ };
-    window.displayWhatsAppSchedules = function() { /* Disabled */ };
+    window.loadWhatsAppSchedules = function () { /* Disabled */ };
+    window.displayWhatsAppSchedules = function () { /* Disabled */ };
 });
 
 // Check authentication
@@ -135,15 +135,13 @@ async function loadAttendance(filters = {}, page = 1) {
         const response = await window.api.makeRequest('GET', `/admin/attendance?${params}`);
 
         if (response.success) {
-            // Filter out WhatsApp schedule data from attendance records
-            const cleanAttendanceRecords = (response.data || []).filter(record => {
-                // Skip records that appear to be WhatsApp schedules
-                if (record.type === 'whatsapp' || record.day_of_week || record.start_time || record.end_time) {
-                    return false;
-                }
-                // Only include records that have attendance-specific fields
-                return record && record.assistant_name && record.time_recorded && record.session_id;
-            });
+            // Filter out WhatsApp schedule data from attendance records if needed
+            // But keep regular session attendance records which have start_time
+            const cleanAttendanceRecords = (response.data || []).map(record => {
+                // Ensure record is valid
+                if (!record || !record.assistant_name || !record.time_recorded) return null;
+                return record;
+            }).filter(Boolean);
 
             allAttendanceRecords = cleanAttendanceRecords;
             filteredRecords = [...allAttendanceRecords];
@@ -166,17 +164,10 @@ async function loadAttendance(filters = {}, page = 1) {
 function displayAttendance(records) {
     const tbody = document.getElementById('attendance-table');
 
-    // Filter out any WhatsApp schedule related records from attendance data
-    const filteredRecords = records.filter(record => {
-        // Skip records that appear to be WhatsApp schedules
-        if (record.type === 'whatsapp' || record.day_of_week || record.start_time || record.end_time) {
-            return false;
-        }
-        // Only include records that have attendance-specific fields
-        return record && record.assistant_name && record.time_recorded && record.session_id;
-    });
+    // Records are already cleaned in loadAttendance, but let's ensure we have a valid array
+    const filteredRecords = records || [];
 
-    if (!filteredRecords || filteredRecords.length === 0) {
+    if (filteredRecords.length === 0) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="8" class="text-center">No attendance records found.</td>
