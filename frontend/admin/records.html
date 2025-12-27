@@ -28,6 +28,26 @@
     <div class="main-content">
         <div class="top-bar">
             <h1>Activity Records</h1>
+            <div class="top-bar-actions" style="display: flex; gap: 0.75rem;">
+                <button class="btn btn-secondary" id="export-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Export Excel
+                </button>
+                <button class="btn btn-outline" id="export-individual-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <path d="M16 13H8"></path>
+                        <path d="M16 17H8"></path>
+                        <path d="M10 9H8"></path>
+                    </svg>
+                    Export 🌟
+                </button>
+            </div>
         </div>
 
         <div id="alert-container"></div>
@@ -379,6 +399,8 @@
 
     <script src="../shared/js/sidebar-template.js"></script>
     <script src="js/sidebar.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="../shared/js/api.js"></script>
     <script src="js/records.js"></script>
 </body>

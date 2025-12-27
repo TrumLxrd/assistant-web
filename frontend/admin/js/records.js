@@ -601,8 +601,120 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
     }
 });
 
+// Export to Excel (single file with all records)
+function exportToExcel() {
+    if (filteredRecords.length === 0) {
+        showAlert('No records to export', 'error');
+        return;
+    }
+
+    const data = filteredRecords.map(record => {
+        const startDate = new Date(record.start_time).toLocaleString();
+        const endDate = record.end_time ? new Date(record.end_time).toLocaleString() : 'Ongoing';
+
+        return {
+            'Assistant': record.user_name || 'Unknown',
+            'Type': record.type || 'N/A',
+            'Session': record.call_session_name || 'N/A',
+            'Start Time': startDate,
+            'End Time': endDate,
+            'Duration (min)': record.duration_minutes || 0,
+            'Students Handled': record.students_handled_count || 0,
+            'Notes': record.notes || ''
+        };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Activity Report');
+
+    const filename = `activity_report_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, filename);
+
+    showAlert('Activity report exported successfully');
+}
+
+// Export individual files per assistant as ZIP
+function exportIndividualToZip() {
+    if (filteredRecords.length === 0) {
+        showAlert('No records to export', 'error');
+        return;
+    }
+
+    // Group records by assistant (user_name)
+    const recordsByUser = {};
+    filteredRecords.forEach(record => {
+        const userName = record.user_name || 'Unknown';
+        if (!recordsByUser[userName]) {
+            recordsByUser[userName] = [];
+        }
+        recordsByUser[userName].push(record);
+    });
+
+    // Get date range for filename
+    const dateFrom = document.getElementById('filter-date-from').value;
+    const dateTo = document.getElementById('filter-date-to').value;
+    const dateRange = dateFrom && dateTo ? `${dateFrom}_to_${dateTo}` : new Date().toISOString().split('T')[0];
+
+    const zip = new JSZip();
+    let processedCount = 0;
+    const totalUsers = Object.keys(recordsByUser).length;
+
+    showAlert(`Exporting ${filteredRecords.length} activity records for ${totalUsers} assistants...`);
+
+    // Create Excel file for each assistant and add to ZIP
+    Object.entries(recordsByUser).forEach(([userName, records]) => {
+        const data = records.map(record => {
+            const startDate = new Date(record.start_time).toLocaleString();
+            const endDate = record.end_time ? new Date(record.end_time).toLocaleString() : 'Ongoing';
+
+            return {
+                'Assistant': record.user_name || 'Unknown',
+                'Type': record.type || 'N/A',
+                'Session': record.call_session_name || 'N/A',
+                'Start Time': startDate,
+                'End Time': endDate,
+                'Duration (min)': record.duration_minutes || 0,
+                'Students Handled': record.students_handled_count || 0,
+                'Notes': record.notes || ''
+            };
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, `${userName} Activities`);
+
+        // Generate Excel file as array buffer
+        const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+
+        // Sanitize filename
+        const safeUserName = userName.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
+        const filename = `${safeUserName}_activity_${dateRange}.xlsx`;
+
+        // Add file to ZIP
+        zip.file(filename, excelBuffer);
+        processedCount++;
+    });
+
+    // Generate and download ZIP file
+    zip.generateAsync({ type: 'blob' }).then(content => {
+        const zipFilename = `individual_activity_reports_${dateRange}.zip`;
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(content);
+        link.download = zipFilename;
+        link.click();
+
+        showAlert(`Successfully exported ${processedCount} activity files in ZIP (${totalUsers} assistants, ${filteredRecords.length} total records)`);
+    }).catch(error => {
+        console.error('Error creating ZIP file:', error);
+        showAlert('Failed to create ZIP file', 'error');
+    });
+}
+
 // Event listeners
 document.getElementById('add-record-btn').addEventListener('click', openAddModal);
+document.getElementById('export-btn').addEventListener('click', exportToExcel);
+document.getElementById('export-individual-btn').addEventListener('click', exportIndividualToZip);
 document.getElementById('close-add-modal').addEventListener('click', closeAddModal);
 document.getElementById('cancel-add-btn').addEventListener('click', closeAddModal);
 document.getElementById('close-edit-modal').addEventListener('click', closeEditModal);
