@@ -289,135 +289,179 @@ function resetFilters() {
 }
 
 // Export to Excel (single file with all records)
-function exportToExcel() {
-    if (allAttendanceRecords.length === 0) {
-        showAlert('No records to export', 'error');
-        return;
+async function exportToExcel() {
+    // Show loading state
+    const exportBtn = document.getElementById('export-btn');
+    const originalContent = exportBtn.innerHTML;
+    exportBtn.disabled = true;
+    exportBtn.innerHTML = `
+        <svg class="animate-spin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 0.5rem; animation: spin 1s linear infinite;">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+        </svg>
+        Exporting...
+    `;
+
+    try {
+        const params = new URLSearchParams({
+            ...currentFilters,
+            limit: 10000 // Large limit for export
+        });
+
+        const response = await window.api.makeRequest('GET', `/admin/attendance?${params}`);
+
+        if (response.success && response.data) {
+            let dataToExport = response.data.filter(record => {
+                const subject = (record.subject || '').toLowerCase();
+                return !subject.includes('whatsapp') && !subject.includes('call');
+            });
+
+            if (dataToExport.length === 0) {
+                showAlert('No records to export', 'error');
+                return;
+            }
+
+            const data = dataToExport.map(record => {
+                const attendanceDate = new Date(record.time_recorded).toLocaleDateString();
+                const attendanceTime = new Date(record.time_recorded).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                return {
+                    'Assistant': record.assistant_name || 'Unknown',
+                    'Session': record.subject || 'N/A',
+                    'Center': record.center_name || 'Unknown',
+                    'Date': attendanceDate,
+                    'Time': attendanceTime,
+                    'Status': (record.delay_minutes || 0) <= 10 ? 'On Time' : 'Late',
+                    'Delay': record.delay_minutes || 0,
+                    'Notes': record.notes || ''
+                };
+            });
+
+            const worksheet = XLSX.utils.json_to_sheet(data);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance Report');
+
+            const filename = `attendance_report_${new Date().toISOString().split('T')[0]}.xlsx`;
+            XLSX.writeFile(workbook, filename);
+
+            showAlert(`Attendance report (${dataToExport.length} records) exported successfully`);
+        } else {
+            showAlert('Failed to fetch records for export', 'error');
+        }
+    } catch (error) {
+        console.error('Export error:', error);
+        showAlert('An error occurred during export', 'error');
+    } finally {
+        exportBtn.disabled = false;
+        exportBtn.innerHTML = originalContent;
     }
-
-    // Filter out any WhatsApp schedule related records (safety check)
-    const filteredRecords = allAttendanceRecords.filter(record => {
-        // Ensure we're only exporting attendance records, not WhatsApp schedules
-        return record && typeof record.assistant_name === 'string' && record.time_recorded;
-    });
-
-    if (filteredRecords.length === 0) {
-        showAlert('No valid attendance records to export', 'error');
-        return;
-    }
-
-    const data = filteredRecords.map(record => {
-        const attendanceDate = new Date(record.time_recorded).toLocaleDateString();
-        const attendanceTime = new Date(record.time_recorded).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-        return {
-            'Assistant': record.assistant_name || 'Unknown',
-            'Session': record.subject || 'N/A',
-            'Center': record.center_name || 'Unknown',
-            'Date': attendanceDate,
-            'Time': attendanceTime,
-            'Status': (record.delay_minutes || 0) <= 10 ? 'On Time' : 'Late',
-            'Delay (minutes)': record.delay_minutes || 0,
-            'Notes': record.notes || ''
-        };
-    });
-
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance Report');
-
-    const filename = `attendance_report_${new Date().toISOString().split('T')[0]}.xlsx`;
-    XLSX.writeFile(workbook, filename);
-
-    showAlert('Attendance report exported successfully');
 }
 
 // Export individual files per assistant as ZIP
-function exportIndividualToZip() {
-    if (allAttendanceRecords.length === 0) {
-        showAlert('No records to export', 'error');
-        return;
-    }
+async function exportIndividualToZip() {
+    // Show loading state
+    const exportBtn = document.getElementById('export-individual-btn');
+    const originalContent = exportBtn.innerHTML;
+    exportBtn.disabled = true;
+    exportBtn.innerHTML = `
+        <svg class="animate-spin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 0.5rem; animation: spin 1s linear infinite;">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+        </svg>
+        Exporting...
+    `;
 
-    // Filter out any WhatsApp schedule related records (safety check)
-    const validAttendanceRecords = allAttendanceRecords.filter(record => {
-        // Ensure we're only exporting attendance records, not WhatsApp schedules
-        return record && typeof record.assistant_name === 'string' && record.time_recorded;
-    });
-
-    if (validAttendanceRecords.length === 0) {
-        showAlert('No valid attendance records to export', 'error');
-        return;
-    }
-
-    // Group records by assistant
-    const recordsByAssistant = {};
-    validAttendanceRecords.forEach(record => {
-        const assistantName = record.assistant_name || 'Unknown';
-        if (!recordsByAssistant[assistantName]) {
-            recordsByAssistant[assistantName] = [];
-        }
-        recordsByAssistant[assistantName].push(record);
-    });
-
-    // Get date range for filename
-    const dateFrom = document.getElementById('filter-date-from').value;
-    const dateTo = document.getElementById('filter-date-to').value;
-    const dateRange = dateFrom && dateTo ? `${dateFrom}_to_${dateTo}` : new Date().toISOString().split('T')[0];
-
-    const zip = new JSZip();
-    let processedCount = 0;
-    const totalAssistants = Object.keys(recordsByAssistant).length;
-
-    showAlert(`Exporting ${validAttendanceRecords.length} attendance records for ${totalAssistants} assistants...`);
-
-    // Create Excel file for each assistant and add to ZIP
-    Object.entries(recordsByAssistant).forEach(([assistantName, records]) => {
-        const data = records.map(record => {
-            const attendanceDate = new Date(record.time_recorded).toLocaleDateString();
-            const attendanceTime = new Date(record.time_recorded).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-            return {
-                'Assistant': record.assistant_name || 'Unknown',
-                'Session': record.subject || 'N/A',
-                'Center': record.center_name || 'Unknown',
-                'Date': attendanceDate,
-                'Time': attendanceTime,
-                'Status': (record.delay_minutes || 0) <= 10 ? 'On Time' : 'Late',
-                'Delay (minutes)': record.delay_minutes || 0,
-                'Notes': record.notes || ''
-            };
+    try {
+        const params = new URLSearchParams({
+            ...currentFilters,
+            limit: 10000 // Large limit for export
         });
 
-        const worksheet = XLSX.utils.json_to_sheet(data);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, `${assistantName} Attendance`);
+        const response = await window.api.makeRequest('GET', `/admin/attendance?${params}`);
 
-        // Generate Excel file as array buffer
-        const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        if (response.success && response.data) {
+            let dataToExport = response.data.filter(record => {
+                const subject = (record.subject || '').toLowerCase();
+                return !subject.includes('whatsapp') && !subject.includes('call');
+            });
 
-        // Sanitize filename (remove special characters)
-        const safeAssistantName = assistantName.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
-        const filename = `${safeAssistantName}_attendance_${dateRange}.xlsx`;
+            if (dataToExport.length === 0) {
+                showAlert('No records to export', 'error');
+                return;
+            }
 
-        // Add file to ZIP
-        zip.file(filename, excelBuffer);
-        processedCount++;
-    });
+            // Group records by assistant
+            const recordsByAssistant = {};
+            dataToExport.forEach(record => {
+                const assistantName = record.assistant_name || 'Unknown';
+                if (!recordsByAssistant[assistantName]) {
+                    recordsByAssistant[assistantName] = [];
+                }
+                recordsByAssistant[assistantName].push(record);
+            });
 
-    // Generate and download ZIP file
-    zip.generateAsync({ type: 'blob' }).then(content => {
-        const zipFilename = `individual_attendance_reports_${dateRange}.zip`;
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(content);
-        link.download = zipFilename;
-        link.click();
+            // Get date range for filename
+            const dateFrom = document.getElementById('filter-date-from').value;
+            const dateTo = document.getElementById('filter-date-to').value;
+            const dateRange = dateFrom && dateTo ? `${dateFrom}_to_${dateTo}` : new Date().toISOString().split('T')[0];
 
-        showAlert(`Successfully exported ${processedCount} attendance files in ZIP (${totalAssistants} assistants, ${validAttendanceRecords.length} total records)`);
-    }).catch(error => {
-        console.error('Error creating ZIP file:', error);
+            const zip = new JSZip();
+            let processedCount = 0;
+            const totalAssistants = Object.keys(recordsByAssistant).length;
+
+            showAlert(`Exporting ${dataToExport.length} attendance records for ${totalAssistants} assistants...`);
+
+            // Create Excel file for each assistant and add to ZIP
+            Object.entries(recordsByAssistant).forEach(([assistantName, records]) => {
+                const data = records.map(record => {
+                    const attendanceDate = new Date(record.time_recorded).toLocaleDateString();
+                    const attendanceTime = new Date(record.time_recorded).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                    return {
+                        'Assistant': record.assistant_name || 'Unknown',
+                        'Session': record.subject || 'N/A',
+                        'Center': record.center_name || 'Unknown',
+                        'Date': attendanceDate,
+                        'Time': attendanceTime,
+                        'Status': (record.delay_minutes || 0) <= 10 ? 'On Time' : 'Late',
+                        'Delay': record.delay_minutes || 0,
+                        'Notes': record.notes || ''
+                    };
+                });
+
+                const worksheet = XLSX.utils.json_to_sheet(data);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, `${assistantName} Attendance`);
+
+                // Generate Excel file as array buffer
+                const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+
+                // Sanitize filename (remove special characters)
+                const safeAssistantName = assistantName.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
+                const filename = `${safeAssistantName}_attendance_${dateRange}.xlsx`;
+
+                // Add file to ZIP
+                zip.file(filename, excelBuffer);
+                processedCount++;
+            });
+
+            // Generate and download ZIP file
+            const content = await zip.generateAsync({ type: 'blob' });
+            const zipFilename = `individual_attendance_reports_${dateRange}.zip`;
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = zipFilename;
+            link.click();
+
+            showAlert(`Successfully exported ${processedCount} attendance files in ZIP (${totalAssistants} assistants, ${dataToExport.length} total records)`);
+        } else {
+            showAlert('Failed to fetch records for export', 'error');
+        }
+    } catch (error) {
+        console.error('Export error:', error);
         showAlert('Failed to create ZIP file', 'error');
-    });
+    } finally {
+        exportBtn.disabled = false;
+        exportBtn.innerHTML = originalContent;
+    }
 }
 
 // Manual Attendance Modal

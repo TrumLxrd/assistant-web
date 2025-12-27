@@ -602,113 +602,193 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
 });
 
 // Export to Excel (single file with all records)
-function exportToExcel() {
-    if (filteredRecords.length === 0) {
-        showAlert('No records to export', 'error');
-        return;
+async function exportToExcel() {
+    const searchTerm = document.getElementById('search-input').value.toLowerCase();
+
+    // Show loading state
+    const exportBtn = document.getElementById('export-btn');
+    const originalContent = exportBtn.innerHTML;
+    exportBtn.disabled = true;
+    exportBtn.innerHTML = `
+        <svg class="animate-spin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 0.5rem; animation: spin 1s linear infinite;">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+        </svg>
+        Exporting...
+    `;
+
+    try {
+        const params = new URLSearchParams({
+            ...currentFilters,
+            limit: 10000 // Large limit to get everything matching filters
+        });
+
+        const response = await window.api.makeRequest('GET', `/activities/logs?${params}`);
+
+        if (response.success && response.data) {
+            let dataToExport = response.data;
+
+            // If there's a search term, apply it locally
+            if (searchTerm) {
+                dataToExport = dataToExport.filter(record =>
+                    record.user_name?.toLowerCase().includes(searchTerm)
+                );
+            }
+
+            if (dataToExport.length === 0) {
+                showAlert('No records to export', 'error');
+                return;
+            }
+
+            const data = dataToExport.map(record => {
+                const startDate = new Date(record.start_time).toLocaleString();
+                const endDate = record.end_time ? new Date(record.end_time).toLocaleString() : 'Ongoing';
+
+                return {
+                    'Assistant': record.user_name || 'Unknown',
+                    'Type': record.type || 'N/A',
+                    'Session': record.call_session_name || 'N/A',
+                    'Start Time': startDate,
+                    'End Time': endDate,
+                    'Duration (min)': record.duration_minutes || 0,
+                    'Hours': (record.duration_minutes / 60).toFixed(2),
+                    'Students Handled': record.students_handled_count || 0,
+                    'Notes': record.notes || ''
+                };
+            });
+
+            const worksheet = XLSX.utils.json_to_sheet(data);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Activity Report');
+
+            const filename = `activity_report_${new Date().toISOString().split('T')[0]}.xlsx`;
+            XLSX.writeFile(workbook, filename);
+
+            showAlert(`Activity report (${dataToExport.length} records) exported successfully`);
+        } else {
+            showAlert('Failed to fetch records for export', 'error');
+        }
+    } catch (error) {
+        console.error('Export error:', error);
+        showAlert('An error occurred during export', 'error');
+    } finally {
+        exportBtn.disabled = false;
+        exportBtn.innerHTML = originalContent;
     }
-
-    const data = filteredRecords.map(record => {
-        const startDate = new Date(record.start_time).toLocaleString();
-        const endDate = record.end_time ? new Date(record.end_time).toLocaleString() : 'Ongoing';
-
-        return {
-            'Assistant': record.user_name || 'Unknown',
-            'Type': record.type || 'N/A',
-            'Session': record.call_session_name || 'N/A',
-            'Start Time': startDate,
-            'End Time': endDate,
-            'Duration (min)': record.duration_minutes || 0,
-            'Students Handled': record.students_handled_count || 0,
-            'Notes': record.notes || ''
-        };
-    });
-
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Activity Report');
-
-    const filename = `activity_report_${new Date().toISOString().split('T')[0]}.xlsx`;
-    XLSX.writeFile(workbook, filename);
-
-    showAlert('Activity report exported successfully');
 }
 
 // Export individual files per assistant as ZIP
-function exportIndividualToZip() {
-    if (filteredRecords.length === 0) {
-        showAlert('No records to export', 'error');
-        return;
-    }
+async function exportIndividualToZip() {
+    const searchTerm = document.getElementById('search-input').value.toLowerCase();
 
-    // Group records by assistant (user_name)
-    const recordsByUser = {};
-    filteredRecords.forEach(record => {
-        const userName = record.user_name || 'Unknown';
-        if (!recordsByUser[userName]) {
-            recordsByUser[userName] = [];
-        }
-        recordsByUser[userName].push(record);
-    });
+    // Show loading state
+    const exportBtn = document.getElementById('export-individual-btn');
+    const originalContent = exportBtn.innerHTML;
+    exportBtn.disabled = true;
+    exportBtn.innerHTML = `
+        <svg class="animate-spin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 0.5rem; animation: spin 1s linear infinite;">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+        </svg>
+        Exporting...
+    `;
 
-    // Get date range for filename
-    const dateFrom = document.getElementById('filter-date-from').value;
-    const dateTo = document.getElementById('filter-date-to').value;
-    const dateRange = dateFrom && dateTo ? `${dateFrom}_to_${dateTo}` : new Date().toISOString().split('T')[0];
-
-    const zip = new JSZip();
-    let processedCount = 0;
-    const totalUsers = Object.keys(recordsByUser).length;
-
-    showAlert(`Exporting ${filteredRecords.length} activity records for ${totalUsers} assistants...`);
-
-    // Create Excel file for each assistant and add to ZIP
-    Object.entries(recordsByUser).forEach(([userName, records]) => {
-        const data = records.map(record => {
-            const startDate = new Date(record.start_time).toLocaleString();
-            const endDate = record.end_time ? new Date(record.end_time).toLocaleString() : 'Ongoing';
-
-            return {
-                'Assistant': record.user_name || 'Unknown',
-                'Type': record.type || 'N/A',
-                'Session': record.call_session_name || 'N/A',
-                'Start Time': startDate,
-                'End Time': endDate,
-                'Duration (min)': record.duration_minutes || 0,
-                'Students Handled': record.students_handled_count || 0,
-                'Notes': record.notes || ''
-            };
+    try {
+        const params = new URLSearchParams({
+            ...currentFilters,
+            limit: 10000 // Large limit for export
         });
 
-        const worksheet = XLSX.utils.json_to_sheet(data);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, `${userName} Activities`);
+        const response = await window.api.makeRequest('GET', `/activities/logs?${params}`);
 
-        // Generate Excel file as array buffer
-        const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        if (response.success && response.data) {
+            let dataToExport = response.data;
 
-        // Sanitize filename
-        const safeUserName = userName.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
-        const filename = `${safeUserName}_activity_${dateRange}.xlsx`;
+            // Apply local search filter if present
+            if (searchTerm) {
+                dataToExport = dataToExport.filter(record =>
+                    record.user_name?.toLowerCase().includes(searchTerm)
+                );
+            }
 
-        // Add file to ZIP
-        zip.file(filename, excelBuffer);
-        processedCount++;
-    });
+            if (dataToExport.length === 0) {
+                showAlert('No records to export', 'error');
+                return;
+            }
 
-    // Generate and download ZIP file
-    zip.generateAsync({ type: 'blob' }).then(content => {
-        const zipFilename = `individual_activity_reports_${dateRange}.zip`;
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(content);
-        link.download = zipFilename;
-        link.click();
+            // Group records by assistant (user_name)
+            const recordsByUser = {};
+            dataToExport.forEach(record => {
+                const userName = record.user_name || 'Unknown';
+                if (!recordsByUser[userName]) {
+                    recordsByUser[userName] = [];
+                }
+                recordsByUser[userName].push(record);
+            });
 
-        showAlert(`Successfully exported ${processedCount} activity files in ZIP (${totalUsers} assistants, ${filteredRecords.length} total records)`);
-    }).catch(error => {
-        console.error('Error creating ZIP file:', error);
+            // Get date range for filename
+            const dateFrom = document.getElementById('filter-date-from').value;
+            const dateTo = document.getElementById('filter-date-to').value;
+            const dateRange = dateFrom && dateTo ? `${dateFrom}_to_${dateTo}` : new Date().toISOString().split('T')[0];
+
+            const zip = new JSZip();
+            let processedCount = 0;
+            const totalUsers = Object.keys(recordsByUser).length;
+
+            showAlert(`Exporting ${dataToExport.length} activity records for ${totalUsers} assistants...`);
+
+            // Create Excel file for each assistant and add to ZIP
+            Object.entries(recordsByUser).forEach(([userName, records]) => {
+                const data = records.map(record => {
+                    const startDate = new Date(record.start_time).toLocaleString();
+                    const endDate = record.end_time ? new Date(record.end_time).toLocaleString() : 'Ongoing';
+
+                    return {
+                        'Assistant': record.user_name || 'Unknown',
+                        'Type': record.type || 'N/A',
+                        'Session': record.call_session_name || 'N/A',
+                        'Start Time': startDate,
+                        'End Time': endDate,
+                        'Duration (min)': record.duration_minutes || 0,
+                        'Hours': (record.duration_minutes / 60).toFixed(2),
+                        'Students Handled': record.students_handled_count || 0,
+                        'Notes': record.notes || ''
+                    };
+                });
+
+                const worksheet = XLSX.utils.json_to_sheet(data);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, `${userName} Activities`);
+
+                // Generate Excel file as array buffer
+                const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+
+                // Sanitize filename
+                const safeUserName = userName.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
+                const filename = `${safeUserName}_activity_${dateRange}.xlsx`;
+
+                // Add file to ZIP
+                zip.file(filename, excelBuffer);
+                processedCount++;
+            });
+
+            // Generate and download ZIP file
+            const content = await zip.generateAsync({ type: 'blob' });
+            const zipFilename = `individual_activity_reports_${dateRange}.zip`;
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = zipFilename;
+            link.click();
+
+            showAlert(`Successfully exported ${processedCount} activity files in ZIP (${totalUsers} assistants, ${dataToExport.length} total records)`);
+        } else {
+            showAlert('Failed to fetch records for export', 'error');
+        }
+    } catch (error) {
+        console.error('Export error:', error);
         showAlert('Failed to create ZIP file', 'error');
-    });
+    } finally {
+        exportBtn.disabled = false;
+        exportBtn.innerHTML = originalContent;
+    }
 }
 
 // Event listeners
