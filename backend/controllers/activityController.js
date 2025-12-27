@@ -2048,7 +2048,8 @@ const getActivityLogs = async (req, res) => {
             for (const pair of uniquePairs) {
                 const count = await CallSessionStudent.countDocuments({
                     call_session_id: pair.sessionId,
-                    assigned_to: pair.userId
+                    assigned_to: pair.userId,
+                    filter_status: { $ne: '' } // Only count students with a status (completed)
                 });
                 studentsHandledCounts[`${pair.userId}_${pair.sessionId}`] = count;
             }
